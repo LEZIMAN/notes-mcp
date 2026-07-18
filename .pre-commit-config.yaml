@@ -1,0 +1,35 @@
+# pre-commit 钩子:提交即体检(开发规范 §4 工具链落地)
+#
+# 首次使用:
+#   pre-commit install          # 装 git hook(也可 python scripts/dev.py install-hooks)
+#   pre-commit run --all-files  # 手动全量跑一次
+#   pre-commit autoupdate       # 把下面 rev 升到各仓库最新(建议偶尔跑)
+
+repos:
+  # —— Ruff:lint + format(取代 black/flake8/isort)——
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      - id: ruff           # 静态检查(--fix 自动修可修的,如导入排序)
+        args: [--fix]
+      - id: ruff-format    # 代码格式化
+
+  # —— mypy:渐进式类型检查(配置在 pyproject.toml,已 exclude tests/scripts/web)——
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.11.2
+    hooks:
+      - id: mypy
+        args: [--config-file=pyproject.toml, notes_mcp]
+        additional_dependencies: []   # 将来按需补 chromadb/openai 等以获更准类型
+
+  # —— 标准小钩子:琐碎卫生 ——
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace      # 去行尾空格
+      - id: end-of-file-fixer        # 确保文件末尾有换行
+      - id: check-yaml               # YAML 语法(.pre-commit-config / claude_desktop_config)
+      - id: check-toml               # TOML 语法(pyproject)
+      - id: check-merge-conflict     # 拦残留冲突标记
+      - id: check-added-large-files  # 拦意外大文件(如误提交 data/ 或 venv/)
+        args: [--maxkb=500]

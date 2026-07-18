@@ -1,0 +1,35 @@
+[project]
+name = "notes-mcp"
+version = "0.1.0"
+description = "把 markdown 笔记目录变成 MCP 知识助手 server"
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"          # 免 @pytest.mark.asyncio 装饰
+testpaths = ["tests"]
+markers = [
+  "integration: 需要真实 ollama/网络,慢(CI 可 -m 'not integration' 跳过)",
+  "needs_ollama: 需要 ollama 服务在跑",
+]
+
+# —— Ruff:lint + format 二合一(取代 black/flake8/isort)——
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+exclude = ["venv", ".venv", "data", "node_modules", ".git", "dist"]
+
+[tool.ruff.lint]
+# E=pycodestyle 错误 F=pyflakes I=isort 导入排序 UP=pyupgrade
+# B=bugbear SIM=简化 N=命名
+select = ["E", "F", "I", "UP", "B", "SIM", "N"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+# —— mypy:渐进式类型检查(非 strict,入门友好)——
+[tool.mypy]
+python_version = "3.10"
+warn_unused_ignores = true
+warn_redundant_casts = true
+ignore_missing_imports = true   # chromadb/bm25s/jieba 等无 stub,先放行
+exclude = ["tests/", "scripts/", "web/"]

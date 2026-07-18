@@ -1,0 +1,12 @@
+# 开发/测试依赖(含运行依赖)
+-r requirements.txt
+
+# —— 测试 ——
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
+pytest-cov
+
+# —— 代码质量(落地开发规范 §4)——
+ruff>=0.6.0          # lint + format 二合一
+mypy>=1.10.0         # 渐进式类型检查
+pre-commit>=3.7.0    # git 提交钩子,提交即体检
