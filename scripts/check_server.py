@@ -6,6 +6,7 @@
 
 用法:python scripts/check_server.py
 """
+
 import asyncio
 import sys
 from pathlib import Path
