@@ -190,12 +190,4 @@ notes-mcp/
 
 ---
 
-## 面试讲法
-
-> **一句话**:开源了一个通用 MCP 知识库 server——把任意 markdown 笔记目录变成 MCP server,任意支持 MCP 的 AI 工具都能查;配套一个 LangGraph agent 同时消费自己 + filesystem + fetch 多个 server,演示工具运行时动态发现。
->
-> **差异化**:三大原语齐全(呼应控制权归属)、hybrid search(语义+BM25+RRF)、lifespan 自动增量建库、双传输(stdio+HTTP)、溯源。不是「封一个函数」的 demo,是按 MCP 协议完整设计的产品级 server。
-
----
-
 *项目状态:📋 设计完成,正在实现 · 2026-07-17*
