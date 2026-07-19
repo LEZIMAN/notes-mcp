@@ -21,7 +21,7 @@ def make_indexer(tmp_path):
 
     def _make(dim=8):
         client = chromadb.EphemeralClient()
-        collection = client.get_or_create_collection(f"test_{dim}")
+        collection = client.get_or_create_collection(f"test_{tmp_path.name}")
         embedder = FakeEmbedder(dim=dim)
         return Indexer(
             embedder=embedder,
@@ -238,7 +238,7 @@ def test_embed_failure_raises_indexer_error(make_indexer, notes_dir):
     client = chromadb.EphemeralClient()
     idx = Indexer(
         embedder=BrokenEmbedder(),
-        collection=client.get_or_create_collection("broken"),
+        collection=client.get_or_create_collection(f"broken_{notes_dir.parent.name}"),
         sqlite_path=notes_dir.parent / "state.db",
         bm25_dir=notes_dir.parent / "bm25",
     )

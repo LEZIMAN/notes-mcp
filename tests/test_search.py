@@ -83,7 +83,7 @@ def searcher(tmp_path):
 
     embedder = FakeEmbedder(dim=8)
     client = chromadb.EphemeralClient()
-    collection = client.get_or_create_collection("search_test")
+    collection = client.get_or_create_collection(f"search_{tmp_path.name}")
     idx = Indexer(
         embedder=embedder,
         collection=collection,

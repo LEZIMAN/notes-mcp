@@ -71,6 +71,11 @@ class Searcher:
         self._id_map = id_map  # BM25 行号 → chunk_id
         self._embedder = embedder
 
+    @property
+    def collection(self):
+        """Chroma collection(给 server 列标题/统计用)。"""
+        return self._collection
+
     def search(self, query: str, top_k: int = 5) -> list[Hit]:
         """hybrid 检索:语义路 + 关键词路 → RRF 融合 → top_k 带溯源 Hit。
 
