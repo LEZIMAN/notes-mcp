@@ -94,7 +94,7 @@ Desktop                       (同时消费 notes-mcp + filesystem + fetch)
 
 ## 快速开始(预览)
 
-> ⚠️ 项目正在实现中,以下为目标用法。
+> Phase 1 核心闭环已实现(config→indexer→search→server→cli),以下为实际用法。
 
 ```bash
 # 1. 安装
@@ -190,4 +190,4 @@ notes-mcp/
 
 ---
 
-*项目状态:📋 设计完成,正在实现 · 2026-07-17*
+*项目状态:✅ Phase 1 核心闭环完成(config / chunker / embedder / indexer / search / server / cli,88 tests 全绿)· 2026-07-19 · 下一阶段:Phase 2 消费侧 LangGraph agent*
