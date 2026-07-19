@@ -236,9 +236,9 @@ class Indexer:
         if not chunks:
             raise _FileSkipError("空文件")
 
-        # embed(失败不捕获 → IndexerError 整体崩)
+        # embed 批量(失败不捕获 → IndexerError 整体崩)
         try:
-            vectors = [self._embedder.embed(c.text) for c in chunks]
+            vectors = self._embedder.embed_batch([c.text for c in chunks])
         except Exception as e:  # noqa: BLE001 — ollama 挂/网络断
             raise IndexerError(f"embed 失败({path}),疑似 ollama 未启动或模型未拉: {e}") from e
 

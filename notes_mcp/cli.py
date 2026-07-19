@@ -158,6 +158,9 @@ def _setup_logging(level: str) -> None:
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
         stream=sys.stderr,
     )
+    # 第三方库降噪:httpx 每次请求刷屏、jieba/bm25s/chromadb 的 DEBUG
+    for name in ("httpx", "chromadb", "bm25s", "jieba", "openai"):
+        logging.getLogger(name).setLevel(logging.WARNING)
 
 
 def _build_parser() -> argparse.ArgumentParser:

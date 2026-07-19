@@ -55,3 +55,27 @@ def test_embed_passes_correct_model(mock_openai):
     emb.embed("x")
 
     mock_client.embeddings.create.assert_called_once_with(model="custom-model", input=["x"])
+
+
+@patch("notes_mcp.embedder.openai.OpenAI")
+def test_embed_batch_returns_vectors_in_order(mock_openai):
+    """embed_batch 返回与输入同序的向量列表,input 传数组。"""
+    d1, d2, d3 = MagicMock(), MagicMock(), MagicMock()
+    d1.embedding = [0.1]
+    d2.embedding = [0.2]
+    d3.embedding = [0.3]
+    resp = MagicMock()
+    resp.data = [d1, d2, d3]
+    client = MagicMock()
+    client.embeddings.create.return_value = resp
+    mock_openai.return_value = client
+
+    emb = OllamaEmbedder("http://x:11434/v1", dim=1)
+    vecs = emb.embed_batch(["a", "b", "c"])
+    assert vecs == [[0.1], [0.2], [0.3]]
+    client.embeddings.create.assert_called_once_with(model="bge-m3", input=["a", "b", "c"])
+
+
+def test_embed_batch_empty_returns_empty(fake_embedder):
+    """空输入返回空列表。"""
+    assert fake_embedder.embed_batch([]) == []

@@ -51,6 +51,7 @@ def test_no_subcommand_errors(capsys):
 def test_main_config_error_returns_2(monkeypatch, capsys, tmp_path):
     """NOTES_DIR 未设/目录不存在 → 退出码 2 + 提示。"""
     monkeypatch.delenv("NOTES_DIR", raising=False)
+    monkeypatch.setattr("notes_mcp.config._find_env", lambda: None)  # 不读项目根 .env
     monkeypatch.setenv("CHROMA_PATH", str(tmp_path / "chroma"))
     monkeypatch.setenv("SQLITE_PATH", str(tmp_path / "state.db"))
 

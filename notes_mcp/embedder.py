@@ -57,3 +57,18 @@ class OllamaEmbedder:
             input=[text],
         )
         return response.data[0].embedding
+
+    def embed_batch(self, texts: list[str], batch_size: int = 128) -> list[list[float]]:
+        """批量嵌入:一次 HTTP 塞多个文本(ollama /v1/embeddings 支持 input 数组)。
+
+        内部按 batch_size 分片,避免单次 payload 过大。
+        返回与 texts 同序的向量列表(ollama data 顺序与 input 一致)。
+        """
+        if not texts:
+            return []
+        results: list[list[float]] = []
+        for i in range(0, len(texts), batch_size):
+            batch = texts[i : i + batch_size]
+            resp = self._client.embeddings.create(model=self._model, input=batch)
+            results.extend(d.embedding for d in resp.data)
+        return results

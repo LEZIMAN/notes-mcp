@@ -43,6 +43,10 @@ class FakeEmbedder:
         digest = hashlib.shake_128(text.encode("utf-8")).digest(self._dim)
         return [(byte - 128) / 128.0 for byte in digest]
 
+    def embed_batch(self, texts: list[str], batch_size: int = 128) -> list[list[float]]:
+        """批量嵌入(fake:循环调 embed,顺序与输入一致)。"""
+        return [self.embed(t) for t in texts]
+
 
 @pytest.fixture
 def fake_embedder() -> FakeEmbedder:
