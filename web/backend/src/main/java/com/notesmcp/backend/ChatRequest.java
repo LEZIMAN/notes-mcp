@@ -1,8 +1,11 @@
 package com.notesmcp.backend;
 
 /**
- * /api/chat 请求体:{"message": "用笔记解释 RAG"}。
- * record 是 Java 的不可变数据类(自动生成构造器/访问器/equals),适合做 DTO。
+ * /api/chat 请求体:{"message": "...", "sessionId": "sess-xxx"}。
+ * sessionId 可选——不传则创建新会话。
  */
-public record ChatRequest(String message) {
+public record ChatRequest(String message, String sessionId) {
+    public ChatRequest {
+        if (sessionId == null) sessionId = "";
+    }
 }

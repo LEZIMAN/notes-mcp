@@ -29,9 +29,19 @@ data/
 *.db
 *.db-journal
 
-# ===== 前端(Web 全栈,实现后)=====
+# ===== 前端(Web 全栈)=====
 node_modules/
 .vite/
+dist/
+
+# ===== 本地配置 / 密钥(绝不提交!)=====
+settings.json
+
+# ===== 资源 / 设计稿(非代码)=====
+resources/
+
+# ===== 设计反馈草稿 =====
+docs/*反馈.txt
 
 # ===== IDE / 编辑器 =====
 .vscode/

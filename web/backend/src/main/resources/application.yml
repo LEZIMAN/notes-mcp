@@ -6,7 +6,7 @@ spring:
     name: notes-mcp-backend
 
   ai:
-    # —— Ollama(qwen3:8b 生成)——
+    # —— Ollama(本地,默认)——
     ollama:
       base-url: http://127.0.0.1:11434   # 用 127.0.0.1 避 IPv6
       chat:
@@ -14,7 +14,13 @@ spring:
           model: qwen3:8b
           temperature: 0.7
 
-    # —— MCP client:连 notes-mcp server(HTTP)——
+    # —— OpenAI(第三方 API / 自定义端点)——默认禁用——
+    # 运行时通过 settings.json 或 /api/settings API 配置。
+    openai:
+      api-key: unused                    # Spring 自动配置要求有值
+      base-url: https://api.openai.com/v1
+
+    # —— MCP client:连 notes-mcp server——
     # Spring AI 的 HttpClient transport 支持 streamable-http,
     # notes-mcp(fastmcp)以 `serve --transport http` 暴露 http://127.0.0.1:8765/mcp。
     # 连上后 server 的 tools(search_notes 等)自动注册为 ToolCallbackProvider。
@@ -38,8 +44,8 @@ spring:
               cwd: D:/Learn/AI/项目/notes-mcp
               env:
                 PYTHONUNBUFFERED: "1"    # 双保险:环境变量强制无缓冲
-                # Spring AI 的 cwd 字段没传给子进程,用 PYTHONPATH 让它找到 notes_mcp 包
                 PYTHONPATH: "D:/Learn/AI/项目/notes-mcp"
+                NOTES_DIR: ${NOTES_DIR:d:/Learn/AI/笔记}   # 从 main() 注入的系统属性读取,传给 Python 子进程
 
 # Web 后端端口(配置.md §2:前端 5173 → 后端 8000 → notes-mcp 8765)
 server:
@@ -49,3 +55,8 @@ logging:
   level:
     org.springframework.ai: INFO
     io.modelcontextprotocol: INFO   # MCP client(调试互操作时可改 DEBUG)
+
+# —— notes-mcp 自定义配置 ——
+notesmcp:
+  settings:
+    path: D:/Learn/AI/项目/notes-mcp/settings.json   # 多 Provider 配置文件

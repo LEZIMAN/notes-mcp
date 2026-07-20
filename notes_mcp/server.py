@@ -143,12 +143,31 @@ def _merge_hits(*groups: list[Hit]) -> list[Hit]:
 
 
 def _read_note_by_title(title: str, notes_dirs: list[Path]) -> str:
-    """按标题从 notes_dirs 找 {title}.md 读全文。路径安全:is_relative_to 防 ../。"""
+    """按标题取笔记:先按文件名匹配(含子目录),再按 H1 标题匹配。
+
+    路径安全:is_relative_to 防 ../ 遍历。
+    """
     for root in notes_dirs:
         root_resolved = Path(root).resolve()
-        candidate = (root_resolved / f"{title}.md").resolve()
-        if candidate.is_relative_to(root_resolved) and candidate.exists():
-            return candidate.read_text(encoding="utf-8")
+        # 策略 1:文件名匹配(扫描子目录找 {title}.md)
+        try:
+            for md_path in root_resolved.rglob(f"{title}.md"):
+                if md_path.resolve().is_relative_to(root_resolved):
+                    return md_path.read_text(encoding="utf-8")
+        except (OSError, PermissionError):
+            pass
+        # 策略 2:按 H1 标题匹配(扫 .md 文件,取第一行的 # 标题)
+        try:
+            for md_path in root_resolved.rglob("*.md"):
+                if not md_path.resolve().is_relative_to(root_resolved):
+                    continue
+                with open(md_path, encoding="utf-8") as f:
+                    first_line = f.readline().strip()
+                h1 = first_line.lstrip("#").strip()
+                if h1 == title:
+                    return md_path.read_text(encoding="utf-8")
+        except (OSError, PermissionError):
+            continue
     return f"未找到标题为「{title}」的笔记。"
 
 
