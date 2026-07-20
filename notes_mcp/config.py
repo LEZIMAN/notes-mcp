@@ -81,8 +81,8 @@ class Config:
             top_k=_int("TOP_K"),
             chunk_size=_int("CHUNK_SIZE"),
             overlap=_int("OVERLAP"),
-            chroma_path=Path(_get("CHROMA_PATH")),
-            sqlite_path=Path(_get("SQLITE_PATH")),
+            chroma_path=_resolve_path(_get("CHROMA_PATH")),
+            sqlite_path=_resolve_path(_get("SQLITE_PATH")),
             mcp_http_host=_get("MCP_HTTP_HOST"),
             mcp_http_port=_int("MCP_HTTP_PORT"),
             web_backend_host=_get("WEB_BACKEND_HOST"),
@@ -148,6 +148,18 @@ def _parse_dirs(raw: str) -> list[Path]:
     if not raw or not raw.strip():
         return []
     return [Path(p.strip()) for p in raw.split(";") if p.strip()]
+
+
+def _resolve_path(p: str) -> Path:
+    """相对路径基于项目根解析(不依赖 cwd);绝对路径原样。
+
+    避免 Spring AI / agent 等子进程 cwd 不同时,data 落到不同位置
+    (如 Spring AI spawn 的子进程 cwd 非项目根 → 相对 ./data 指向别处)。
+    """
+    path = Path(p)
+    if not path.is_absolute():
+        path = Path(__file__).resolve().parent.parent / p
+    return path
 
 
 def _find_env() -> Path | None:

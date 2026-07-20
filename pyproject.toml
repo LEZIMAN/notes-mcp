@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "notes-mcp"
 version = "0.1.0"
@@ -33,3 +37,8 @@ warn_unused_ignores = true
 warn_redundant_casts = true
 ignore_missing_imports = true   # chromadb/bm25s/jieba 等无 stub,先放行
 exclude = ["tests/", "scripts/", "web/"]
+
+# —— 打包:让 pip install -e . 把 notes_mcp 装进 venv(editable)——
+# 装后 `python -m notes_mcp` 任何 cwd 都能 import(Spring AI spawn 子进程不依赖 cwd)
+[tool.setuptools.packages.find]
+include = ["notes_mcp*"]
