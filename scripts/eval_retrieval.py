@@ -1,15 +1,17 @@
-"""检索 eval:量化语义检索质量(正例分难度 + 负例 + 歧义)。
+"""检索 eval:对比「纯语义 vs 语义+rerank」检索质量。
 
 数据集:eval/queries.jsonl,每行 {query, relevant_files, difficulty, type}。
-  - positive:应命中 relevant(difficulty: easy/medium/hard)
-  - negative:完全无关(relevant=[]),测 precision——不该硬凑
-  - ambiguous:术语堆砌无意图(relevant=[]),测意图识别——应提示细化
+  - positive:应命中(easy/medium/hard)
+  - negative:完全无关,测 precision
+  - ambiguous:术语堆砌无意图,测意图识别
 
+双方法对比:
+  - 纯语义(bi-encoder,Chroma cosine)
+  - 语义+rerank(粗召回 top-20 → cross-encoder 精排)
 指标:recall@1/3/5/10 + MRR(正例,按难度分组)。
-命中判定:检索结果 source 路径包含任一 relevant 片段即算相关(文件级)。
 
 用法:python scripts/eval_retrieval.py
-输出:终端表 + docs/检索eval报告.md + docs/检索测试报告.md
+输出:终端 + docs/检索eval报告.md + docs/检索测试报告.md
 """
 
 import json
@@ -19,6 +21,7 @@ from pathlib import Path
 
 from notes_mcp.cli import _build_searcher
 from notes_mcp.config import Config
+from notes_mcp.search import Searcher
 
 EVAL_FILE = Path(__file__).resolve().parent.parent / "eval" / "queries.jsonl"
 REPORT_FILE = Path(__file__).resolve().parent.parent / "docs" / "检索eval报告.md"
@@ -26,6 +29,7 @@ TEST_REPORT_FILE = Path(__file__).resolve().parent.parent / "docs" / "检索测�
 K_LIST = [1, 3, 5, 10]
 MAX_K = max(K_LIST)
 DIFFS = ["easy", "medium", "hard"]
+METHODS = ["纯语义", "语义+rerank"]
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +69,6 @@ def mrr(sources: list[str], relevant_files: list[str]) -> float:
 
 
 def first_hit_rank(sources: list[str], relevant_files: list[str]) -> int:
-    """首个相关 source 的排名(1-based),未命中返回 -1。"""
     for i, s in enumerate(sources, 1):
         if is_relevant(s, relevant_files):
             return i
@@ -73,190 +76,197 @@ def first_hit_rank(sources: list[str], relevant_files: list[str]) -> int:
 
 
 def evaluate(
-    searcher, queries: list[dict]
+    searchers: dict, queries: list[dict]
 ) -> tuple[dict, dict, list[dict], list[dict], list[dict]]:
-    """返回 (按难度分组, 总体, 每条详情, 负例, 歧义)。"""
+    """返回 (按难度×方法, 总体×方法, 每条, 负例, 歧义)。"""
     per_query: list[dict] = []
     for q in queries:
-        hits = searcher.search(q["query"], MAX_K)
-        sources = hits_to_sources(hits)
-        per_query.append({
-            "query": q["query"],
-            "relevant": q.get("relevant_files", []),
-            "difficulty": q.get("difficulty", "easy"),
-            "type": q.get("type", "positive"),
-            "sources": sources,
-        })
+        sources = {}
+        for m, s in searchers.items():
+            sources[m] = hits_to_sources(s.search(q["query"], MAX_K))
+        per_query.append(
+            {
+                "query": q["query"],
+                "relevant": q.get("relevant_files", []),
+                "difficulty": q.get("difficulty", "easy"),
+                "type": q.get("type", "positive"),
+                "sources": sources,
+            }
+        )
 
-    # 正例按难度分组
-    summary = {d: {**{f"recall@{k}": 0.0 for k in K_LIST}, "mrr": 0.0, "count": 0} for d in DIFFS}
-    pos_all = [pq for pq in per_query if pq["type"] == "positive"]
-    for pq in pos_all:
-        d = pq["difficulty"]
-        if d not in summary:
+    summary = {
+        m: {d: {**{f"recall@{k}": 0.0 for k in K_LIST}, "mrr": 0.0, "count": 0} for d in DIFFS}
+        for m in METHODS
+    }
+    total = {m: {**{f"recall@{k}": 0.0 for k in K_LIST}, "mrr": 0.0, "count": 0} for m in METHODS}
+    for pq in per_query:
+        if pq["type"] != "positive":
             continue
-        summary[d]["count"] += 1
-        for k in K_LIST:
-            summary[d][f"recall@{k}"] += recall_at_k(pq["sources"], pq["relevant"], k)
-        summary[d]["mrr"] += mrr(pq["sources"], pq["relevant"])
-    for d in DIFFS:
-        n = summary[d]["count"]
+        for m in METHODS:
+            srcs = pq["sources"][m]
+            d = pq["difficulty"]
+            if d in DIFFS:
+                summary[m][d]["count"] += 1
+                for k in K_LIST:
+                    summary[m][d][f"recall@{k}"] += recall_at_k(srcs, pq["relevant"], k)
+                summary[m][d]["mrr"] += mrr(srcs, pq["relevant"])
+            total[m]["count"] += 1
+            for k in K_LIST:
+                total[m][f"recall@{k}"] += recall_at_k(srcs, pq["relevant"], k)
+            total[m]["mrr"] += mrr(srcs, pq["relevant"])
+    for m in METHODS:
+        for d in DIFFS:
+            n = summary[m][d]["count"]
+            if n:
+                for k in K_LIST:
+                    summary[m][d][f"recall@{k}"] /= n
+                summary[m][d]["mrr"] /= n
+        n = total[m]["count"]
         if n:
             for k in K_LIST:
-                summary[d][f"recall@{k}"] /= n
-            summary[d]["mrr"] /= n
-
-    # 总体(全部正例)
-    total = {**{f"recall@{k}": 0.0 for k in K_LIST}, "mrr": 0.0, "count": len(pos_all)}
-    for pq in pos_all:
-        for k in K_LIST:
-            total[f"recall@{k}"] += recall_at_k(pq["sources"], pq["relevant"], k)
-        total["mrr"] += mrr(pq["sources"], pq["relevant"])
-    n = len(pos_all)
-    if n:
-        for k in K_LIST:
-            total[f"recall@{k}"] /= n
-        total["mrr"] /= n
+                total[m][f"recall@{k}"] /= n
+            total[m]["mrr"] /= n
 
     negatives = [pq for pq in per_query if pq["type"] == "negative"]
     ambiguities = [pq for pq in per_query if pq["type"] == "ambiguous"]
     return summary, total, per_query, negatives, ambiguities
 
 
-def render_table(summary, total, n_pos, n_neg, n_amb) -> str:
+def render_table(total: dict, n_pos: int, n_neg: int, n_amb: int) -> str:
     lines = [
-        f"\n检索 Eval(纯语义 · 正例 {n_pos} + 负例 {n_neg} + 歧义 {n_amb})\n",
-        "| 难度 | 样本 | " + " | ".join(f"recall@{k}" for k in K_LIST) + " | MRR |",
-        "|" + "---|" * (len(K_LIST) + 3),
+        f"\n检索 Eval(正例 {n_pos} + 负例 {n_neg} + 歧义 {n_amb})\n",
+        "| 方法 | " + " | ".join(f"recall@{k}" for k in K_LIST) + " | MRR |",
+        "|" + "---|" * (len(K_LIST) + 2),
+    ]
+    for m in METHODS:
+        row = [m] + [f"{total[m][f'recall@{k}']:.1%}" for k in K_LIST]
+        row.append(f"{total[m]['mrr']:.3f}")
+        lines.append("| " + " | ".join(row) + " |")
+    return "\n".join(lines)
+
+
+def render_by_diff(summary: dict) -> str:
+    lines = [
+        "",
+        "按难度 recall@1 / MRR:",
+        "",
+        "| 难度 | n | 纯语义 r@1 | +rerank r@1 | 纯语义 MRR | +rerank MRR |",
+        "|---|---|---|---|---|---|",
     ]
     for d in DIFFS:
-        c = summary[d]["count"]
+        c = summary["纯语义"][d]["count"]
         if c == 0:
             continue
-        row = [d, str(c)] + [f"{summary[d][f'recall@{k}']:.1%}" for k in K_LIST]
-        row.append(f"{summary[d]['mrr']:.3f}")
-        lines.append("| " + " | ".join(row) + " |")
-    row = ["总计", str(n_pos)] + [f"{total[f'recall@{k}']:.1%}" for k in K_LIST]
-    row.append(f"{total['mrr']:.3f}")
-    lines.append("| " + " | ".join(row) + " |")
+        sem, rr = summary["纯语义"][d], summary["语义+rerank"][d]
+        lines.append(
+            f"| {d} | {c} | {sem['recall@1']:.1%} | {rr['recall@1']:.1%} | "
+            f"{sem['mrr']:.3f} | {rr['mrr']:.3f} |"
+        )
     return "\n".join(lines)
 
 
 def write_report(summary, total, n_pos, negatives, ambiguities) -> None:
     lines = [
-        "# 检索 Eval 报告(纯语义)",
+        "# 检索 Eval 报告(纯语义 vs 语义+rerank)",
         "",
-        f"> 正例 {n_pos} 条(分难度) + 负例 {len(negatives)} 条 + 歧义 {len(ambiguities)} 条。",
+        f"> 正例 {n_pos} + 负例 {len(negatives)} + 歧义 {len(ambiguities)}。",
         "",
-        "## 按难度分组(正例)",
+        "## 总体对比",
         "",
-        "| 难度 | 样本 | " + " | ".join(f"recall@{k}" for k in K_LIST) + " | MRR |",
-        "|" + "---|" * (len(K_LIST) + 3),
+        "| 方法 | " + " | ".join(f"recall@{k}" for k in K_LIST) + " | MRR |",
+        "|" + "---|" * (len(K_LIST) + 2),
     ]
-    for d in DIFFS:
-        c = summary[d]["count"]
-        if c == 0:
-            continue
-        row = [d, str(c)] + [f"{summary[d][f'recall@{k}']:.1%}" for k in K_LIST]
-        row.append(f"{summary[d]['mrr']:.3f}")
+    for m in METHODS:
+        row = [m] + [f"{total[m][f'recall@{k}']:.1%}" for k in K_LIST]
+        row.append(f"{total[m]['mrr']:.3f}")
         lines.append("| " + " | ".join(row) + " |")
-    row = ["总计", str(n_pos)] + [f"{total[f'recall@{k}']:.1%}" for k in K_LIST]
-    row.append(f"{total['mrr']:.3f}")
-    lines.append("| " + " | ".join(row) + " |")
-    lines += ["", "## 负例(完全无关,测 precision——不该硬凑)", ""]
-    for nq in negatives:
-        top3 = [Path(s).name for s in nq["sources"][:3]]
-        lines.append(f"- `{nq['query']}` → top3: {top3 if top3 else '(空)'}")
-    lines += ["", "## 歧义(术语堆砌无意图,测意图识别——应提示细化)", ""]
-    for aq in ambiguities:
-        top3 = [Path(s).name for s in aq["sources"][:3]]
-        lines.append(f"- `{aq['query']}` → top3: {top3 if top3 else '(空)'}")
     lines += [
         "",
-        "## 改进方向",
+        "## 按难度 recall@1 / MRR",
         "",
-        "- **hard 题** recall/MRR 最能体现检索质量,是 rerank 的主战场。",
-        "- **负例**全硬凑 → 需 score 阈值过滤(不相关的不返回)。",
-        "- **歧义**词相关无意图 → 产品应提示用户明确意图。",
-        "- 加 rerank + score 阈值后在此报告对比。",
+        "| 难度 | n | 纯语义 r@1 | +rerank r@1 | 纯语义 MRR | +rerank MRR |",
+        "|---|---|---|---|---|---|",
     ]
+    for d in DIFFS:
+        c = summary["纯语义"][d]["count"]
+        if c == 0:
+            continue
+        sem, rr = summary["纯语义"][d], summary["语义+rerank"][d]
+        lines.append(
+            f"| {d} | {c} | {sem['recall@1']:.1%} | {rr['recall@1']:.1%} | "
+            f"{sem['mrr']:.3f} | {rr['mrr']:.3f} |"
+        )
+    lines += ["", "## 负例(rerank 后 top-3,检查硬凑)", ""]
+    for nq in negatives:
+        top3 = [Path(s).name for s in nq["sources"]["语义+rerank"][:3]]
+        lines.append(f"- `{nq['query']}` → {top3 if top3 else '(空)'}")
+    lines += ["", "## 歧义(rerank 后 top-3)", ""]
+    for aq in ambiguities:
+        top3 = [Path(s).name for s in aq["sources"]["语义+rerank"][:3]]
+        lines.append(f"- `{aq['query']}` → {top3 if top3 else '(空)'}")
     REPORT_FILE.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def write_test_report(per_query: list[dict]) -> None:
-    """正例 PASS/FAIL + 负例 + 歧义 人工 review + 难度分组。"""
+    """正例双方法 rank 对比 + 负例/歧义(rerank top-3)。"""
     pos_rows, neg_rows, amb_rows = [], [], []
     passed = 0
     for i, pq in enumerate(per_query, 1):
         tid = f"T{i:03d}"
         if pq["type"] == "negative":
-            top3 = ", ".join(Path(s).stem for s in pq["sources"][:3]) or "(空)"
-            neg_rows.append(f"| {tid} | {pq['query']} | {top3} | ⚠️ 人工 review(硬凑?) |")
+            top3 = ", ".join(Path(s).stem for s in pq["sources"]["语义+rerank"][:3]) or "(空)"
+            neg_rows.append(f"| {tid} | {pq['query']} | {top3} | ⚠️ 人工 review |")
             continue
         if pq["type"] == "ambiguous":
-            top3 = ", ".join(Path(s).stem for s in pq["sources"][:3]) or "(空)"
-            amb_rows.append(f"| {tid} | {pq['query']} | {top3} | ⚠️ 人工 review(沾边?) |")
+            top3 = ", ".join(Path(s).stem for s in pq["sources"]["语义+rerank"][:3]) or "(空)"
+            amb_rows.append(f"| {tid} | {pq['query']} | {top3} | ⚠️ 人工 review |")
             continue
-        rank = first_hit_rank(pq["sources"], pq["relevant"])
-        if 1 <= rank <= 5:
-            verdict, actual, passed = "✅ PASS", f"rank={rank}", passed + 1
-        elif rank > 5:
-            verdict, actual = "❌ FAIL", f"rank={rank}(>5)"
-        else:
-            verdict, actual = "❌ FAIL", "未命中"
+        rel = pq["relevant"]
+        rank_sem = first_hit_rank(pq["sources"]["纯语义"], rel)
+        rank_rr = first_hit_rank(pq["sources"]["语义+rerank"], rel)
+        ok = 1 <= rank_rr <= 5
+        if ok:
+            passed += 1
+        verdict = "✅ PASS" if ok else "❌ FAIL"
+        fmt = lambda r: f"rank={r}" if r > 0 else "未命中"  # noqa: E731
         pos_rows.append(
-            f"| {tid} | {pq['query']} | {pq['difficulty']} | top-5 命中 | {actual} | {verdict} |"
+            f"| {tid} | {pq['query']} | {pq['difficulty']} | {fmt(rank_sem)} | "
+            f"{fmt(rank_rr)} | {verdict} |"
         )
 
     n_pos = len(pos_rows)
     lines = [
-        "# 检索测试报告",
+        "# 检索测试报告(纯语义 vs 语义+rerank)",
         "",
-        f"> 正例 {n_pos} 条(通过 {passed}) + 负例 {len(neg_rows)} 条 + 歧义 {len(amb_rows)} 条。",
+        f"> 正例 {n_pos} 条(rerank 通过 {passed}) + 负例 {len(neg_rows)} + 歧义 {len(amb_rows)}。",
         "",
-        "## 一、正例(应命中)",
+        "## 一、正例(rank 对比:看 rerank 是否提升头部排名)",
         "",
-        "| 编号 | 测试项(query) | 难度 | 预期 | 实际(rank) | 通过 |",
+        "| 编号 | 测试项 | 难度 | 纯语义 rank | +rerank rank | 通过(rerank) |",
         "|---|---|---|---|---|---|",
     ]
     lines += pos_rows
     lines += [
         "",
-        "## 二、负例(完全无关,测 precision——不该硬凑)",
+        "## 二、负例(rerank 后 top-3,检查硬凑)",
         "",
-        "| 编号 | 测试项(query) | 返回 top-3 | 状态 |",
+        "| 编号 | 测试项 | 返回 top-3 | 状态 |",
         "|---|---|---|---|",
     ]
     lines += neg_rows if neg_rows else ["| — | (无) | — | — |"]
     lines += [
         "",
-        "## 三、歧义(术语堆砌无意图,测意图识别——应提示细化)",
+        "## 三、歧义(rerank 后 top-3)",
         "",
-        "| 编号 | 测试项(query) | 返回 top-3 | 状态 |",
+        "| 编号 | 测试项 | 返回 top-3 | 状态 |",
         "|---|---|---|---|",
     ]
     lines += amb_rows if amb_rows else ["| — | (无) | — | — |"]
     lines += [
-        "", "## 四、按难度通过率(正例)", "",
-        "| 难度 | 样本 | 通过 | 通过率 |", "|---|---|---|---|",
-    ]
-    for d in DIFFS:
-        in_diff = [pq for pq in per_query if pq["type"] == "positive" and pq["difficulty"] == d]
-        cnt = len(in_diff)
-        if cnt == 0:
-            continue
-        ok = sum(1 for pq in in_diff if 1 <= first_hit_rank(pq["sources"], pq["relevant"]) <= 5)
-        lines.append(f"| {d} | {cnt} | {ok} | {ok / cnt:.1%} |")
-    lines += [
         "",
         "## 说明",
         "",
-        "- **正例 PASS**:top-5 命中 relevant(rank≤5)。",
-        "- **负例**:完全无关(relevant=[]),检查是否硬凑(precision 缺陷)。",
-        "- **歧义**:术语堆砌无意图(relevant=[]),检查是否沾边合理,",
-        "  产品应提示用户细化意图。",
-        "- **难度**:easy/medium/hard(仅正例)。",
-        "- **FAIL 排查**:先看是检索器召回差还是标注错(eval 反向校验标注)。",
+        "- **纯语义 rank vs +rerank rank**:若 rerank 把 rank>1 提到 1,说明精排生效。",
     ]
     TEST_REPORT_FILE.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
@@ -265,13 +275,20 @@ def main() -> int:
     logging.basicConfig(level=logging.INFO, stream=sys.stderr, format="%(message)s")
     config = Config.from_env()
     config.validate()
-    searcher, result = _build_searcher(config)
+    searcher_rr, result = _build_searcher(config)
+    searcher_sem = Searcher(  # noqa: SLF001 — 复用 embedder 做纯语义对比
+        searcher_rr.collection,
+        searcher_rr._embedder,
+        reranker=None,
+    )
     logger.info("库就绪:%d 文件 / %d chunks", result.total_files, result.total_chunks)
     queries = load_queries(EVAL_FILE)
-    logger.info("加载 %d 条 query(正例+负例+歧义)\n", len(queries))
-    summary, total, per_query, negatives, ambiguities = evaluate(searcher, queries)
+    logger.info("加载 %d 条 query\n", len(queries))
+    searchers = {"纯语义": searcher_sem, "语义+rerank": searcher_rr}
+    summary, total, per_query, negatives, ambiguities = evaluate(searchers, queries)
     n_pos = len([pq for pq in per_query if pq["type"] == "positive"])
-    print(render_table(summary, total, n_pos, len(negatives), len(ambiguities)))
+    print(render_table(total, n_pos, len(negatives), len(ambiguities)))
+    print(render_by_diff(summary))
     write_report(summary, total, n_pos, negatives, ambiguities)
     write_test_report(per_query)
     logger.info("\n汇总报告: %s", REPORT_FILE)

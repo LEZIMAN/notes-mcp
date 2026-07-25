@@ -33,6 +33,7 @@ REQUIRED_DEPS = {
     "langgraph",
     "langchain-openai",
     "chromadb",
+    "flagembedding",
     "openai",
     "python-dotenv",
     "fastapi",

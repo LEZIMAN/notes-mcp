@@ -89,3 +89,50 @@ def test_search_hit_text_from_chunk(searcher):
     assert hits
     assert isinstance(hits[0].text, str)
     assert len(hits[0].text) > 0
+
+
+# —— rerank 测试(用 FakeReranker,不依赖真模型) ————————————————————
+
+
+class FakeReranker:
+    """假 reranker:返回逆序归一化分(doc[0]=0, doc[-1]=1)。
+
+    用于验证 Searcher 是否按 rerank 分重排(而非语义顺序)。
+    接口与 notes_mcp.reranker.Reranker 对齐:.rerank(query, docs) → [float]。
+    """
+
+    @property
+    def name(self) -> str:
+        return "fake-reranker"
+
+    def rerank(self, query: str, documents: list[str]) -> list[float]:
+        n = len(documents)
+        return [i / max(n - 1, 1) for i in range(n)]
+
+
+def test_search_reranker_reorders(searcher):
+    """带 reranker 时,结果按 rerank 分排序(与纯语义顺序不同)。"""
+    sem_hits = searcher.search("RAG", top_k=3)
+    if len(sem_hits) < 2:
+        return  # 候选不足,无法验证重排
+    rr_searcher = Searcher(  # noqa: SLF001 — 复用 fixture 的 collection/embedder
+        searcher.collection, searcher._embedder, reranker=FakeReranker()
+    )
+    rr_hits = rr_searcher.search("RAG", top_k=3)
+    # FakeReranker 逆序 → rerank 顺序应不同于纯语义
+    assert [h.chunk_id for h in rr_hits] != [h.chunk_id for h in sem_hits]
+
+
+def test_search_rerank_score_normalized(searcher):
+    """rerank 后 Hit.score 是归一化分([0,1]),而非 -distance。"""
+    rr_searcher = Searcher(  # noqa: SLF001
+        searcher.collection, searcher._embedder, reranker=FakeReranker()
+    )
+    hits = rr_searcher.search("RAG", top_k=3)
+    assert hits
+    for h in hits:
+        assert 0.0 <= h.score <= 1.0
+    # 应按 score 降序(rerank 分高的在前)
+    scores = [h.score for h in hits]
+    assert scores == sorted(scores, reverse=True)
+

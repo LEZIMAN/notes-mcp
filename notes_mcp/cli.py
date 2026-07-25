@@ -18,6 +18,7 @@ import chromadb
 from notes_mcp.config import Config, ConfigError
 from notes_mcp.embedder import OllamaEmbedder
 from notes_mcp.indexer import Indexer, IndexerError
+from notes_mcp.reranker import Reranker
 from notes_mcp.search import Searcher
 from notes_mcp.server import create_mcp, format_hits
 
@@ -123,11 +124,13 @@ def _build_index(config: Config):
 
 
 def _build_searcher(config: Config) -> tuple[Searcher, object]:
-    """建库后造 Searcher,返回 (searcher, BuildResult)。"""
+    """建库后造 Searcher(含可选 rerank),返回 (searcher, BuildResult)。"""
     indexer, result = _build_index(config)
+    reranker = Reranker(config.rerank_model) if config.rerank_enabled else None
     searcher = Searcher(
         collection=indexer.collection,
         embedder=indexer._embedder,  # noqa: SLF001 — 复用同一 embedder
+        reranker=reranker,
     )
     return searcher, result
 

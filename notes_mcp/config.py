@@ -27,6 +27,8 @@ _DEFAULTS: dict[str, str] = {
     "WEB_BACKEND_PORT": "8000",
     "FRONTEND_ORIGIN": "http://localhost:5173",
     "LOG_LEVEL": "INFO",
+    "RERANK_ENABLED": "true",
+    "RERANK_MODEL": "BAAI/bge-reranker-v2-m3",
 }
 
 
@@ -59,6 +61,8 @@ class Config:
     web_backend_port: int
     frontend_origin: str
     log_level: str
+    rerank_enabled: bool = True
+    rerank_model: str = "BAAI/bge-reranker-v2-m3"
 
     @classmethod
     def from_env(cls, env_file: Path | None = None) -> "Config":
@@ -89,6 +93,8 @@ class Config:
             web_backend_port=_int("WEB_BACKEND_PORT"),
             frontend_origin=_get("FRONTEND_ORIGIN"),
             log_level=_get("LOG_LEVEL"),
+            rerank_enabled=_get("RERANK_ENABLED").lower() in ("true", "1", "yes"),
+            rerank_model=_get("RERANK_MODEL"),
         )
 
     def validate(self) -> None:
