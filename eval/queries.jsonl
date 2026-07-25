@@ -1,0 +1,59 @@
+{"query": "ReAct 是什么", "relevant_files": ["01-多工具与-ReAct-循环", "02-ReAct论文精读", "03-ReAct-Prompting"], "difficulty": "easy", "type": "positive"}
+{"query": "Agent 怎么实现工具循环", "relevant_files": ["01-多工具与-ReAct-循环", "10-ReAct智能体精读"], "difficulty": "easy", "type": "positive"}
+{"query": "ReAct 论文的核心思想", "relevant_files": ["02-ReAct论文精读"], "difficulty": "easy", "type": "positive"}
+{"query": "RAG 检索增强生成原理", "relevant_files": ["07-RAG检索增强生成精读"], "difficulty": "easy", "type": "positive"}
+{"query": "embedding 向量和切块策略", "relevant_files": ["08-Embedding与切块策略"], "difficulty": "easy", "type": "positive"}
+{"query": "MCP 协议是什么", "relevant_files": ["12-MCP协议精读"], "difficulty": "easy", "type": "positive"}
+{"query": "Function Calling 怎么用", "relevant_files": ["02-Function-Calling-与-Agent"], "difficulty": "easy", "type": "positive"}
+{"query": "Function Calling 和 MCP 的关系区别", "relevant_files": ["12-MCP协议精读", "02-Function-Calling-与-Agent"], "difficulty": "medium", "type": "positive"}
+{"query": "思维链 Chain of Thought", "relevant_files": ["04-CoT思维链精读"], "difficulty": "easy", "type": "positive"}
+{"query": "自洽解码 多路径投票", "relevant_files": ["05-Self-Consistency自洽解码"], "difficulty": "medium", "type": "positive"}
+{"query": "Reflexion 反思记忆 跨轮学习", "relevant_files": ["06-Reflexion反思记忆精读"], "difficulty": "easy", "type": "positive"}
+{"query": "LangGraph 状态机", "relevant_files": ["09-LangGraph状态机精读", "11-LangGraph进阶"], "difficulty": "easy", "type": "positive"}
+{"query": "LangGraph 记忆流式并行子图", "relevant_files": ["11-LangGraph进阶"], "difficulty": "easy", "type": "positive"}
+{"query": "Transformer 自注意力机制", "relevant_files": ["02-RNN-与-Transformer", "03-The-Illustrated-Transformer"], "difficulty": "easy", "type": "positive"}
+{"query": "RNN 到 Transformer 的演进", "relevant_files": ["02-RNN-与-Transformer"], "difficulty": "easy", "type": "positive"}
+{"query": "GPT2 解码器原理", "relevant_files": ["06-The-Illustrated-GPT2"], "difficulty": "easy", "type": "positive"}
+{"query": "temperature 温度参数调节", "relevant_files": ["01-LLM基本原理-Token-Temperature-Top-P"], "difficulty": "easy", "type": "positive"}
+{"query": "Token 是什么 分词", "relevant_files": ["01-LLM基本原理-Token-Temperature-Top-P"], "difficulty": "easy", "type": "positive"}
+{"query": "文本生成 beam search 解码", "relevant_files": ["04-How-to-generate-text"], "difficulty": "easy", "type": "positive"}
+{"query": "LLM API 流式输出 调用", "relevant_files": ["01-LLM应用开发入门-API-消息-流式"], "difficulty": "easy", "type": "positive"}
+{"query": "prompt 提示工程参数设置", "relevant_files": ["05-LearnPrompting-LLM设置"], "difficulty": "easy", "type": "positive"}
+{"query": "Chroma BM25 jieba 检索三件套", "relevant_files": ["03-检索三件套"], "difficulty": "easy", "type": "positive"}
+{"query": "本地部署 ollama qwen3", "relevant_files": ["02-本地部署推理Agent-Ollama与Qwen3"], "difficulty": "easy", "type": "positive"}
+{"query": "RAG 项目工程实战", "relevant_files": ["01-RAG项目工程实战"], "difficulty": "easy", "type": "positive"}
+{"query": "多智能体协作框架", "relevant_files": ["04-多智能体", "11-LangGraph进阶"], "difficulty": "medium", "type": "positive"}
+{"query": "qwen3", "relevant_files": ["02-本地部署推理Agent-Ollama与Qwen3"], "difficulty": "easy", "type": "positive"}
+{"query": "bge-m3", "relevant_files": ["08-Embedding与切块策略", "03-检索三件套"], "difficulty": "easy", "type": "positive"}
+{"query": "Chroma 向量数据库", "relevant_files": ["03-检索三件套"], "difficulty": "easy", "type": "positive"}
+{"query": "BM25 算法", "relevant_files": ["03-检索三件套", "08-Embedding与切块策略"], "difficulty": "easy", "type": "positive"}
+{"query": "RRF 倒数排名融合", "relevant_files": ["03-检索三件套", "04-search"], "difficulty": "easy", "type": "positive"}
+{"query": "jieba 中文分词", "relevant_files": ["03-检索三件套"], "difficulty": "easy", "type": "positive"}
+{"query": "ollama 本地推理", "relevant_files": ["02-本地部署推理Agent-Ollama与Qwen3"], "difficulty": "easy", "type": "positive"}
+{"query": "Checkpointer 状态持久化", "relevant_files": ["11-LangGraph进阶"], "difficulty": "easy", "type": "positive"}
+{"query": "MessageWindowChatMemory", "relevant_files": ["11-LangGraph进阶"], "difficulty": "easy", "type": "positive"}
+{"query": "12-MCP协议精读", "relevant_files": ["12-MCP协议精读"], "difficulty": "easy", "type": "positive"}
+{"query": "推理行动循环", "relevant_files": ["01-多工具与-ReAct-循环", "02-ReAct论文精读"], "difficulty": "medium", "type": "positive"}
+{"query": "检索增强生成怎么工作", "relevant_files": ["07-RAG检索增强生成精读"], "difficulty": "medium", "type": "positive"}
+{"query": "工具调用标准化协议", "relevant_files": ["12-MCP协议精读"], "difficulty": "medium", "type": "positive"}
+{"query": "把文本变成向量捕捉语义", "relevant_files": ["08-Embedding与切块策略"], "difficulty": "medium", "type": "positive"}
+{"query": "ReAct 和 Reflexion 怎么共同提升 agent", "relevant_files": ["02-ReAct论文精读", "06-Reflexion反思记忆精读"], "difficulty": "hard", "type": "positive"}
+{"query": "CoT 和 Self-Consistency 的关系", "relevant_files": ["04-CoT思维链精读", "05-Self-Consistency自洽解码"], "difficulty": "hard", "type": "positive"}
+{"query": "边想边做的循环 agent", "relevant_files": ["01-多工具与-ReAct-循环", "10-ReAct智能体精读"], "difficulty": "hard", "type": "positive"}
+{"query": "记忆和反思怎么让 agent 跨轮学习", "relevant_files": ["06-Reflexion反思记忆精读", "11-LangGraph进阶"], "difficulty": "hard", "type": "positive"}
+{"query": "LangGraph 和手写 while 循环等价吗", "relevant_files": ["09-LangGraph状态机精读", "10-ReAct智能体精读"], "difficulty": "hard", "type": "positive"}
+{"query": "自注意力和普通注意力的区别", "relevant_files": ["02-RNN-与-Transformer", "03-The-Illustrated-Transformer"], "difficulty": "hard", "type": "positive"}
+{"query": "强化学习 PPO 算法", "relevant_files": [], "difficulty": "negative", "type": "negative"}
+{"query": "图神经网络 GNN", "relevant_files": [], "difficulty": "negative", "type": "negative"}
+{"query": "扩散模型 Diffusion 生成图片", "relevant_files": [], "difficulty": "negative", "type": "negative"}
+{"query": "知识图谱 Neo4j 图数据库", "relevant_files": [], "difficulty": "negative", "type": "negative"}
+{"query": "SVM 支持向量机 原理", "relevant_files": [], "difficulty": "negative", "type": "negative"}
+{"query": "红烧肉怎么做 家常菜谱", "relevant_files": [], "difficulty": "negative", "type": "negative"}
+{"query": "今天上证指数收盘点数", "relevant_files": [], "difficulty": "negative", "type": "negative"}
+{"query": "北京明天会下雨吗", "relevant_files": [], "difficulty": "negative", "type": "negative"}
+{"query": "英超联赛积分榜", "relevant_files": [], "difficulty": "negative", "type": "negative"}
+{"query": "Transformer RAG LangGraph ollama", "relevant_files": [], "difficulty": "ambiguous", "type": "ambiguous"}
+{"query": "MCP ReAct Function Calling qwen3", "relevant_files": [], "difficulty": "ambiguous", "type": "ambiguous"}
+{"query": "Token Embedding CoT Reflexion jieba", "relevant_files": [], "difficulty": "ambiguous", "type": "ambiguous"}
+{"query": "Chroma BM25 RRF bge-m3", "relevant_files": [], "difficulty": "ambiguous", "type": "ambiguous"}
+{"query": "LangGraph Checkpointer ReAct Transformer", "relevant_files": [], "difficulty": "ambiguous", "type": "ambiguous"}

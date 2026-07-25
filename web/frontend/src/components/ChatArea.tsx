@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { message } from 'antd'
 import { UserOutlined, RobotOutlined } from '@ant-design/icons'
-import { sendMessage, fetchSessionMessages } from '../api/client'
+import { sendMessageStream, createSession, fetchSessionMessages } from '../api/client'
 import type { ChatMessage } from '../types'
 import WelcomeState from './WelcomeState'
 import ChatInput from './ChatInput'
@@ -62,7 +62,6 @@ export default function ChatArea({ sessionId, onSessionCreated, refreshSessions 
       activeAction && !text.startsWith('请')
         ? `${makePrompt(activeAction)}${text}`
         : text
-
     if (activeAction) setActiveAction('')
 
     const userMsg: ChatMessage = {
@@ -75,22 +74,39 @@ export default function ChatArea({ sessionId, onSessionCreated, refreshSessions 
     setHasWelcome(false)
     setLoading(true)
 
-    try {
-      const res = await sendMessage(finalText, sessionId || undefined)
-      // 如果是新创建的 session,通知父组件
-      if (!sessionId) {
-        onSessionCreated(res.sessionId)
+    // 确保 session(流式响应体不含 sessionId,需预先创建/复用)
+    let sid = sessionId
+    if (!sid) {
+      try {
+        const s = await createSession()
+        sid = s.id
+        onSessionCreated(sid)
         refreshSessions()
+      } catch {
+        message.error('创建会话失败')
+        setLoading(false)
+        return
       }
-      const aiMsg: ChatMessage = {
-        id: `a-${Date.now()}`,
-        role: 'assistant',
-        content: res.reply,
-        timestamp: Date.now(),
-      }
-      setMessages((prev) => [...prev, aiMsg])
+    }
+
+    // AI 占位消息,流式追加 content(打字机)
+    const aiId = `a-${Date.now()}`
+    setMessages((prev) => [...prev, {
+      id: aiId, role: 'assistant', content: '', timestamp: Date.now(),
+    }])
+
+    try {
+      await sendMessageStream(finalText, sid || undefined, (chunk) => {
+        setMessages((prev) => prev.map((m) =>
+          m.id === aiId ? { ...m, content: m.content + chunk } : m
+        ))
+      })
     } catch {
-      message.error('对话请求失败，请确认后端已启动')
+      setMessages((prev) => prev.map((m) =>
+        m.id === aiId
+          ? { ...m, content: (m.content || '') + '\n\n❌ 对话失败，请确认后端已启动' }
+          : m
+      ))
     } finally {
       setLoading(false)
     }
@@ -126,22 +142,20 @@ export default function ChatArea({ sessionId, onSessionCreated, refreshSessions 
               </div>
               <div className={`message-bubble ${msg.role}`}>
                 {msg.role === 'assistant' ? (
-                  <>
-                    <MarkdownRenderer content={msg.content} />
-                    <SourceCitation content={msg.content} />
-                  </>
+                  msg.content ? (
+                    <>
+                      <MarkdownRenderer content={msg.content} />
+                      <SourceCitation content={msg.content} />
+                    </>
+                  ) : (
+                    <span style={{ opacity: 0.6 }}>思考中...</span>
+                  )
                 ) : (
                   msg.content
                 )}
               </div>
             </div>
           ))}
-          {loading && (
-            <div className="message-row">
-              <div className="message-avatar assistant"><RobotOutlined /></div>
-              <div className="message-bubble assistant" style={{ opacity: 0.6 }}>思考中...</div>
-            </div>
-          )}
           <div ref={endRef} />
         </div>
       )}

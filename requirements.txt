@@ -9,10 +9,8 @@ langchain-openai>=0.1.0         # langchain 的 OpenAI 兼容接口(LLM 调用)
 openai>=1.0.0                   # ollama 走 OpenAI 兼容 /v1 端点
 python-dotenv>=1.0.0            # 读 .env
 
-# —— 检索层(语义 + 关键词 + RRF 融合)——
-chromadb>=0.5.0                 # 向量库:语义检索
-bm25s[core]>=0.1.0             # BM25 关键词检索(比 rank_bm25 快 ~100x)
-jieba>=0.42.0                   # 中文分词(BM25 索引/查询都要)
+# —— 检索层(纯语义)——
+chromadb>=0.5.0                 # 向量库:语义检索(BM25 已移除,见踩坑 #23)
 
 # —— Web 后端(FastAPI 作 MCP client,给前端 REST)——
 fastapi>=0.110.0                # Web 后端框架

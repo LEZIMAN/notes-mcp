@@ -26,6 +26,7 @@ spring:
     # 连上后 server 的 tools(search_notes 等)自动注册为 ToolCallbackProvider。
     mcp:
       client:
+        request-timeout: 120s   # MCP 请求超时(含 initialize)。notes-mcp 首次建库/BM25 恢复可能 >20s 默认值,给足余量
         # stdio:Spring Boot spawn notes-mcp 子进程,走标准 MCP(stdio)连接。
         # 互操作性最好(Phase 2 agent/check_server 都用 stdio 成功);
         # 绕开 streamable-http 跨实现(Spring AI Java ↔ fastmcp Python)的互操作坑

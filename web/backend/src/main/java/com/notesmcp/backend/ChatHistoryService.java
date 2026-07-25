@@ -138,6 +138,31 @@ public class ChatHistoryService {
         return list;
     }
 
+    /** 取最近 limit 条消息(正序:旧→新),用于多轮对话注入 LLM 上下文。 */
+    public List<Map<String, Object>> getRecentMessages(String sessionId, int limit) {
+        var list = new ArrayList<Map<String, Object>>();
+        try (var conn = connect();
+             var stmt = conn.prepareStatement(
+                     "SELECT id, role, content, created_at FROM messages "
+                             + "WHERE session_id = ? ORDER BY id DESC LIMIT ?")) {
+            stmt.setString(1, sessionId);
+            stmt.setInt(2, limit);
+            var rs = stmt.executeQuery();
+            while (rs.next()) {
+                var m = new LinkedHashMap<String, Object>();
+                m.put("role", rs.getString("role"));
+                m.put("content", rs.getString("content"));
+                m.put("createdAt", rs.getLong("created_at"));
+                list.add(m);
+            }
+        } catch (SQLException e) {
+            log.error("获取最近消息失败:{}", e.getMessage());
+        }
+        // DESC 取出后反转为正序(旧→新)
+        java.util.Collections.reverse(list);
+        return list;
+    }
+
     // ===== Messages =====
 
     public void saveMessage(String sessionId, String role, String content) {

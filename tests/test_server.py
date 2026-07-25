@@ -29,12 +29,12 @@ def app(tmp_path):
     embedder = FakeEmbedder(dim=8)
     client = chromadb.EphemeralClient()
     collection = client.get_or_create_collection(f"server_{tmp_path.name}")
-    idx = Indexer(embedder, collection, tmp_path / "state.db", tmp_path / "bm25")
+    idx = Indexer(embedder, collection, tmp_path / "state.db")
     idx.build([d])
 
     config = Config.from_env(env_file=tmp_path / "noenv")
     config.notes_dirs = [d]
-    searcher = Searcher(collection, idx.bm25, idx.bm25_id_map, embedder)
+    searcher = Searcher(collection, embedder)
     return create_mcp(searcher, config)
 
 

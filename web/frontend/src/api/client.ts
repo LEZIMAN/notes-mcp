@@ -31,6 +31,43 @@ export async function sendMessage(
   return res.json();
 }
 
+/** POST /api/chat/stream — 流式对话(SSE 打字机)。逐 chunk 回调,完成时 resolve。 */
+export async function sendMessageStream(
+  message: string,
+  sessionId: string | undefined,
+  onChunk: (chunk: string) => void,
+): Promise<void> {
+  const res = await fetch(`${BASE}/chat/stream`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message, sessionId: sessionId || '' }),
+  });
+  if (!res.ok) throw new Error(`流式请求失败: ${res.status}`);
+
+  const reader = res.body!.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    // SSE 事件以 \n\n 分隔,每个事件内含 data:xxx 行
+    let idx: number;
+    while ((idx = buffer.indexOf('\n\n')) >= 0) {
+      const block = buffer.slice(0, idx);
+      buffer = buffer.slice(idx + 2);
+      for (const line of block.split('\n')) {
+        if (line.startsWith('data:')) {
+          const data = line.slice(5);
+          if (data === '[DONE]') return;
+          onChunk(data);
+        }
+      }
+    }
+  }
+}
+
 // ===== 会话管理 =====
 
 export interface SessionInfo {

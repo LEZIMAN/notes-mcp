@@ -1,25 +1,22 @@
-"""Indexer:增量建库编排器(扫目录 → diff → 切块 → embed → Chroma+BM25+SQLite)。
+"""Indexer:增量建库编排器(扫目录 → diff → 切块 → embed → Chroma + SQLite)。
 
-设计要点(见 docs/设计文档.md §3.1/§4):
-  · Chroma 是单一真相(chunk 文本 + 向量 + metadata);BM25/SQLite 从它派生
+设计要点:
+  · Chroma 是单一真相(chunk 文本 + 向量 + metadata)
   · 增量四态:新增 / 修改 / 删除 / touch(mtime 变但 hash 没变 → 跳过)
-  · BM25 全量重建(从 Chroma 所有 document),持久化到 bm25_dir,启动 load
   · embed 失败 → 抛 IndexerError 整体崩(ollama 挂了就让 server 起不来)
   · 单文件读/切失败 → skip + 记 errors,不搞垮全库
+
+历史:原含 BM25 全量重建 + 持久化(jieba 分词 + bm25s),2026-07-21 移除——
+eval 证明 BM25 独占命中=0 且拖累 MRR(踩坑 #23,详见 docs/检索eval报告.md)。
 
 内部 key 统一用 str(path.resolve())——SQLite 天然存 str,避免 Path/str 混用。
 """
 
 import hashlib
-import json
 import logging
 import sqlite3
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
-
-import bm25s
-import jieba
 
 from notes_mcp.chunker import Chunk, chunk_markdown
 
@@ -75,43 +72,21 @@ class Indexer:
     """增量建库编排器。依赖注入 embedder/collection,便于测试用 fake。
 
     用法:
-        indexer = Indexer(embedder, collection, sqlite_path, bm25_dir)
-        indexer.load()                                    # 启动时尝试恢复 BM25
-        result = indexer.build(notes_dirs, 300, 50)       # 增量建库
-        # 之后 Searcher 用 indexer.collection / .bm25 / .bm25_id_map
+        indexer = Indexer(embedder, collection, sqlite_path)
+        result = indexer.build(notes_dirs, 300, 50)   # 增量建库
+        # 之后 Searcher 用 indexer.collection
     """
 
-    def __init__(
-        self,
-        embedder,
-        collection,
-        sqlite_path: Path,
-        bm25_dir: Path,
-    ) -> None:
+    def __init__(self, embedder, collection, sqlite_path: Path) -> None:
         self._embedder = embedder
         self._collection = collection
         self._sqlite_path = Path(sqlite_path)
-        self._bm25_dir = Path(bm25_dir)
-        self._bm25: Any = None  # bm25s.BM25 | None(无 stub,用 Any)
-        self._id_map: list[str] = []  # BM25 行号 i ↔ chunk_id
         self._init_sqlite()
-
-    # —— 给 Searcher 用的属性 ————————————————————————
 
     @property
     def collection(self):
         """Chroma collection(语义检索用)。"""
         return self._collection
-
-    @property
-    def bm25(self) -> Any:
-        """BM25 检索器(关键词检索用),未建库时为 None。"""
-        return self._bm25
-
-    @property
-    def bm25_id_map(self) -> list[str]:
-        """BM25 行号 → chunk_id 的映射(RRF 融合的 id 对齐命门)。"""
-        return self._id_map
 
     # —— SQLite 初始化 ————————————————————————————
 
@@ -130,28 +105,6 @@ class Indexer:
                 """
             )
 
-    # —— load:启动时从磁盘恢复 BM25 ————————————————————
-
-    def load(self) -> bool:
-        """从 bm25_dir 加载持久化的 BM25 + id_map。返回是否加载成功。
-
-        失败(目录不存在/损坏)不抛异常,返回 False,留给 build 时重建。
-        """
-        index_dir = self._bm25_dir / "index"
-        id_map_file = self._bm25_dir / "id_map.json"
-        if not index_dir.exists() or not id_map_file.exists():
-            return False
-        try:
-            self._bm25 = bm25s.BM25.load(str(index_dir), load_corpus=False)
-            self._id_map = json.loads(id_map_file.read_text(encoding="utf-8"))
-        except Exception as e:  # noqa: BLE001 — 加载失败原因多样,统一降级
-            logger.warning("BM25 加载失败(%s),将在 build 时重建", e)
-            self._bm25 = None
-            self._id_map = []
-            return False
-        logger.info("BM25 已从 %s 恢复(%d chunks)", self._bm25_dir, len(self._id_map))
-        return True
-
     # —— build:增量建库主流程 ———————————————————————
 
     def build(
@@ -160,7 +113,7 @@ class Indexer:
         chunk_size: int = 300,
         overlap: int = 50,
     ) -> BuildResult:
-        """增量建库:扫 → diff → Chroma 增量 → BM25 重建 → SQLite 同步。
+        """增量建库:扫 → diff → Chroma 增量 → SQLite 同步。
 
         embed 失败抛 IndexerError(整体崩);单文件读/切失败 skip。
         """
@@ -185,10 +138,6 @@ class Indexer:
 
         result.skipped = len(touched)
         result.unchanged = len(unchanged)
-
-        # BM25:有变化或首次未加载 → 全量重建 + 持久化
-        if added or modified or deleted or self._bm25 is None:
-            self._rebuild_bm25()
 
         # SQLite 同步状态
         self._sync_sqlite(added, modified, deleted, touched, disk)
@@ -265,33 +214,6 @@ class Indexer:
             "mtime": c.mtime,
             "root": str(c.root),
         }
-
-    # —— BM25 重建 + 持久化 ———————————————————————————
-
-    def _rebuild_bm25(self) -> None:
-        """从 Chroma 所有 document 全量重建 BM25 + 持久化。
-
-        bm25s 无增量 API,故每次有变化都全量重建(chunk 级,id 对齐)。
-        """
-        all_data = self._collection.get(include=["documents"])
-        ids = all_data["ids"]
-        docs = all_data["documents"]
-        self._id_map = list(ids)  # BM25 行号 i ↔ ids[i]
-
-        tokenized = [list(jieba.cut(doc)) for doc in docs]  # 中文分词
-        bm = bm25s.BM25()
-        bm.index(tokenized)
-        self._bm25 = bm
-        self._save_bm25()
-        logger.info("BM25 已重建并持久化(%d chunks)", len(self._id_map))
-
-    def _save_bm25(self) -> None:
-        """持久化 BM25 矩阵 + id_map 到 bm25_dir。"""
-        self._bm25_dir.mkdir(parents=True, exist_ok=True)
-        self._bm25.save(str(self._bm25_dir / "index"))  # bm25s 0.3+:实例方法
-        (self._bm25_dir / "id_map.json").write_text(
-            json.dumps(self._id_map, ensure_ascii=False), encoding="utf-8"
-        )
 
     # —— 扫描 / diff / SQLite 同步 ——————————————————————
 

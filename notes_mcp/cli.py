@@ -98,9 +98,7 @@ def _build_index(config: Config):
         embedder=embedder,
         collection=collection,
         sqlite_path=config.sqlite_path,
-        bm25_dir=_bm25_dir(config),
     )
-    indexer.load()
     try:
         result = indexer.build(config.notes_dirs, config.chunk_size, config.overlap)
     except IndexerError as e:
@@ -129,8 +127,6 @@ def _build_searcher(config: Config) -> tuple[Searcher, object]:
     indexer, result = _build_index(config)
     searcher = Searcher(
         collection=indexer.collection,
-        bm25=indexer.bm25,
-        id_map=indexer.bm25_id_map,
         embedder=indexer._embedder,  # noqa: SLF001 — 复用同一 embedder
     )
     return searcher, result
@@ -144,11 +140,6 @@ def _get_collection(config: Config):
     client = chromadb.PersistentClient(path=str(config.chroma_path))
     name = f"notes_{config.embed_model}_1024"  # bge-m3 固定 1024 维
     return client.get_or_create_collection(name)
-
-
-def _bm25_dir(config: Config):
-    """BM25 持久化目录(与 chroma 同级 data/ 下)。"""
-    return config.chroma_path.parent / "bm25"
 
 
 def _setup_logging(level: str) -> None:

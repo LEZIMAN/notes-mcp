@@ -1,10 +1,8 @@
-"""Indexer 单测:增量建库四态 + touch + 多目录 + 容错 + BM25 持久化。
+"""Indexer 单测:增量建库四态 + touch + 多目录 + 容错。
 
-用 FakeEmbedder + Chroma EphemeralClient + tmp sqlite/bm25_dir,
+用 FakeEmbedder + Chroma EphemeralClient + tmp sqlite,
 不依赖真实 ollama / 持久 Chroma。
 """
-
-import json
 
 import chromadb
 import pytest
@@ -27,7 +25,6 @@ def make_indexer(tmp_path):
             embedder=embedder,
             collection=collection,
             sqlite_path=tmp_path / "state.db",
-            bm25_dir=tmp_path / "bm25",
         )
 
     return _make
@@ -70,15 +67,6 @@ def test_first_build_stores_chunks_in_chroma(make_indexer, notes_dir):
     assert any("RAG.md" in s for s in sources)
     titles = {m["title"] for m in data["metadatas"]}
     assert "RAG" in titles
-
-
-def test_first_build_creates_bm25(make_indexer, notes_dir):
-    """建库后 BM25 非 None,id_map 长度 == chunk 数。"""
-    idx = make_indexer()
-    idx.build([notes_dir])
-
-    assert idx.bm25 is not None
-    assert len(idx.bm25_id_map) == idx.collection.count()
 
 
 # —— 增量:新增 ———————————————————————————————————————————
@@ -240,7 +228,6 @@ def test_embed_failure_raises_indexer_error(make_indexer, notes_dir):
         embedder=BrokenEmbedder(),
         collection=client.get_or_create_collection(f"broken_{notes_dir.parent.name}"),
         sqlite_path=notes_dir.parent / "state.db",
-        bm25_dir=notes_dir.parent / "bm25",
     )
 
     with pytest.raises(IndexerError, match="ollama"):
@@ -263,70 +250,3 @@ def test_exclude_dirs_not_indexed(make_indexer, notes_dir):
     assert result.added == 3  # 只 3 篇真实笔记,venv/dep.md 排除
     sources = {m["source"] for m in idx.collection.get(include=["metadatas"])["metadatas"]}
     assert not any("venv" in s for s in sources)
-
-
-# —— BM25 持久化 + load ————————————————————————————————————
-
-
-def test_bm25_persisted_to_disk(make_indexer, notes_dir, tmp_path):
-    """build 后 bm25_dir 有 index/ 和 id_map.json。"""
-    idx = make_indexer()
-    idx.build([notes_dir])
-
-    assert (idx._bm25_dir / "index").exists()
-    id_map_file = idx._bm25_dir / "id_map.json"
-    assert id_map_file.exists()
-    id_map = json.loads(id_map_file.read_text(encoding="utf-8"))
-    assert len(id_map) == idx.collection.count()
-
-
-def test_load_restores_bm25(make_indexer, notes_dir, tmp_path):
-    """新 Indexer 实例 load() 能从磁盘恢复 BM25 + id_map。"""
-    idx1 = make_indexer()
-    idx1.build([notes_dir])
-    chunk_count = idx1.collection.count()
-
-    # 新实例(模拟 server 重启),指向同一 sqlite/bm25_dir
-    client = chromadb.EphemeralClient()
-    idx2 = Indexer(
-        embedder=idx1._embedder,
-        collection=client.create_collection("reload"),
-        sqlite_path=idx1._sqlite_path,
-        bm25_dir=idx1._bm25_dir,
-    )
-
-    assert idx2.load() is True
-    assert idx2.bm25 is not None
-    assert len(idx2.bm25_id_map) == chunk_count
-
-
-def test_load_returns_false_when_no_persist(make_indexer, tmp_path):
-    """bm25_dir 为空时 load() 返回 False,不抛异常。"""
-    idx = make_indexer()
-    assert idx.load() is False
-    assert idx.bm25 is None
-
-
-# —— id 对齐(BM25 行号 ↔ chunk_id)——————————————————————
-
-
-def test_bm25_id_map_aligns_with_chroma(make_indexer, notes_dir):
-    """id_map 的每个 chunk_id 都能在 Chroma 找到对应记录。"""
-    idx = make_indexer()
-    idx.build([notes_dir])
-
-    chroma_ids = set(idx.collection.get(include=[])["ids"])
-    for chunk_id in idx.bm25_id_map:
-        assert chunk_id in chroma_ids
-
-
-def test_bm25_id_format_matches_chunker(make_indexer, notes_dir):
-    """id_map 的 chunk_id 符合 {source}#{index} 格式。"""
-    idx = make_indexer()
-    idx.build([notes_dir])
-
-    for chunk_id in idx.bm25_id_map:
-        assert "#" in chunk_id
-        source_part, index_part = chunk_id.rsplit("#", 1)
-        assert index_part.isdigit()
-        assert source_part.endswith(".md")

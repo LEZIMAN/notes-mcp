@@ -1,8 +1,8 @@
-"""Markdown 文本切块器(纯逻辑,不依赖 Chroma/BM25/ollama)。
+"""Markdown 文本切块器(纯逻辑,不依赖 Chroma/ollama)。
 
 切块策略:滑动窗口(每个 chunk_size 字符,重叠 overlap)。
 标题提取:优先 Markdown H1(# Title),其次用文件名。
-Chunk id: "{source}#{chunk_index}",与 Chroma/BM25 的 id 对齐(设计文档 §4.1/§4.3)。
+Chunk id: "{source}#{chunk_index}",与 Chroma 的 id 对齐(设计文档 §4.1/§4.3)。
 """
 
 from dataclasses import dataclass
@@ -13,7 +13,7 @@ from pathlib import Path
 
 @dataclass
 class Chunk:
-    """一个切块,对应 Chroma collection / BM25 索引中的一条。
+    """一个切块,对应 Chroma collection 中的一条。
 
     id 格式保证全局唯一:不同源文件的 chunk 不会冲突。
     """
@@ -106,5 +106,5 @@ def _split_text(text: str, size: int, overlap: int) -> list[str]:
 
 
 def _chunk_id(source: Path, index: int) -> str:
-    """Chroma/BM25 通用的 chunk 标识: "{source}#{index}"。"""
+    """Chroma 的 chunk 标识: "{source}#{index}"。"""
     return f"{source}#{index}"

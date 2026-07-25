@@ -33,8 +33,6 @@ REQUIRED_DEPS = {
     "langgraph",
     "langchain-openai",
     "chromadb",
-    "bm25s",
-    "jieba",
     "openai",
     "python-dotenv",
     "fastapi",
@@ -120,7 +118,7 @@ def cmd_serve(args: argparse.Namespace) -> int:
 
 
 def cmd_index(_args: argparse.Namespace) -> int:
-    """建库:扫笔记 → 切块 → Chroma + BM25(依赖 cli.py)。"""
+    """建库:扫笔记 → 切块 → Chroma(依赖 cli.py)。"""
     if not (ROOT / "notes_mcp" / "cli.py").exists():
         print(
             "⚠️ notes_mcp/cli.py 尚未实现(接续点:config → embedder → indexer → cli)。",
