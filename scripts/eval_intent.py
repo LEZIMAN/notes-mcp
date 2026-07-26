@@ -41,14 +41,18 @@ from dotenv import load_dotenv
 from notes_mcp import __version__ as PKG_VERSION
 
 EVAL_FILE = Path(__file__).resolve().parent.parent / "eval" / "queries.jsonl"
-REPORT_DIR = Path(__file__).resolve().parent.parent / "docs" / "测试报告"
+REPORT_DIR = Path(__file__).resolve().parent.parent / "docs" / "04-测试"
 
-# 复刻 web/backend IntentFilter.java 的 PROMPT(逐字一致,单一信息源)。
-# 改这里必须同步改 IntentFilter.java,否则评估的不是生产行为。
+# v2 试验 prompt(目标:降误拦截 FPR)。三处变化:
+#   ① 知识库描述补全(AI/编程/机器学习/LLM/Agent)
+#   ② normal 覆盖"术语/名词/并列"(治 T010 自洽解码 / T034 MessageWindowChatMemory 误拦)
+#   ③ irrelevant 收窄到"日常生活领域"(避免误伤 AI 术语)
+# 验证有效后同步 web/backend IntentFilter.java(单一信息源)。
 PROMPT = (
-    "知识库是AI/编程/学习笔记。判断用户查询意图,只输出一个英文词:"
-    "normal(正常对话:闲聊/问候/或与知识库相关的问题) "
-    "irrelevant(明确询问知识库外领域的具体信息:菜谱做法/天气/体育赛事/股市行情等)。"
+    "知识库是AI/编程/机器学习/LLM/Agent 的学习笔记。判断用户查询意图,只输出一个英文词:"
+    "normal(只要涉及 AI/编程/机器学习/大模型/算法/计算机 的概念、术语、名词、问题——"
+    "哪怕简短或几个词并列——都算正常对话) "
+    "irrelevant(明确只问日常生活领域:菜谱做法/天气/体育赛事/股市行情/娱乐八卦/医疗咨询等)。"
     "查询:"
 )
 

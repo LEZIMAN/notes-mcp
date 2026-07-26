@@ -27,9 +27,10 @@ public class IntentFilter {
     private static final Logger log = LoggerFactory.getLogger(IntentFilter.class);
 
     private static final String PROMPT =
-            "知识库是AI/编程/学习笔记。判断用户查询意图,只输出一个英文词:" +
-            "normal(正常对话:闲聊/问候/或与知识库相关的问题) " +
-            "irrelevant(明确询问知识库外领域的具体信息:菜谱做法/天气/体育赛事/股市行情等)。" +
+            "知识库是AI/编程/机器学习/LLM/Agent 的学习笔记。判断用户查询意图,只输出一个英文词:" +
+            "normal(只要涉及 AI/编程/机器学习/大模型/算法/计算机 的概念、术语、名词、问题——" +
+            "哪怕简短或几个词并列——都算正常对话) " +
+            "irrelevant(明确只问日常生活领域:菜谱做法/天气/体育赛事/股市行情/娱乐八卦/医疗咨询等)。" +
             "查询:";
 
     private final OllamaChatModel ollamaChatModel;
