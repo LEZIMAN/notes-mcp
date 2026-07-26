@@ -1,5 +1,5 @@
 # notes-mcp 运行依赖
-# 详见 docs/配置.md §5 —— 改依赖必须同步该文件(单一信息源)
+# 详见 docs/03-实现/配置.md §5 —— 改依赖必须同步该文件(单一信息源)
 
 # —— MCP server(协议层 + 业务层)——
 fastmcp>=3.0.0                  # FastMCP:三大原语 + lifespan 建库 + 双传输(stdio/HTTP)

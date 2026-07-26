@@ -166,7 +166,7 @@ def cmd_check_sync(_args: argparse.Namespace) -> int:
         print("❌ check-sync 失败(疑似文档与文件漂移):", file=sys.stderr)
         for err in errors:
             print(f"  - {err}", file=sys.stderr)
-        print("提示:同步 docs/配置.md §4/§5 与对应文件(单一信息源)。", file=sys.stderr)
+        print("提示:同步 docs/03-实现/配置.md §4/§5 与对应文件(单一信息源)。", file=sys.stderr)
         return 1
 
     print("✅ check-sync 通过:核心依赖与配置键齐全,无漂移。")

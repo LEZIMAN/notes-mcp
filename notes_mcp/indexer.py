@@ -7,7 +7,7 @@
   · 单文件读/切失败 → skip + 记 errors,不搞垮全库
 
 历史:原含 BM25 全量重建 + 持久化(jieba 分词 + bm25s),2026-07-21 移除——
-eval 证明 BM25 独占命中=0 且拖累 MRR(踩坑 #23,详见 docs/检索eval报告.md)。
+eval 证明 BM25 独占命中=0 且拖累 MRR(踩坑 #23,详见 docs/04-测试/检索eval_2026-07-26.md)。
 
 内部 key 统一用 str(path.resolve())——SQLite 天然存 str,避免 Path/str 混用。
 """

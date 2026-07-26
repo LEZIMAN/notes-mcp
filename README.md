@@ -226,7 +226,7 @@ cd web/backend && mvn compile
 cd web/frontend && npx tsc --noEmit && npx vite build
 ```
 
-提交前检查清单见 [开发规范](./docs/开发规范.md)。
+提交前检查清单见 [开发规范](./docs/03-实现/开发规范.md)。
 
 ---
 

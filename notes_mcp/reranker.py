@@ -1,7 +1,7 @@
 """Reranker:cross-encoder 精排(bge-reranker-v2-m3)。
 
 bi-encoder(嵌入)快但粗:query/doc 分别编码再算距离,丢失交互信息,
-导致"distance 近但语义无关"的硬凑(见 docs/检索eval报告.md 负例)。
+导致"distance 近但语义无关"的硬凑(见 docs/04-测试/检索eval_2026-07-26.md 负例)。
 cross-encoder 准但慢:(query,doc) 拼一起送模型,捕获交互,精准打分。
 
 链路:语义粗召回 top-N → reranker 精排 top-k。

@@ -11,27 +11,43 @@
 指标:recall@1/3/5/10 + MRR(正例,按难度分组)。
 
 用法:python scripts/eval_retrieval.py
-输出:终端 + docs/检索eval报告.md + docs/检索测试报告.md
+输出:终端 + docs/04-测试/检索eval_<日期>_<版本>.md + 检索测试_<日期>_<版本>.md
+      (测试报告规范:快照类带日期+版本,git 可 diff 追溯)
 """
 
 import json
 import logging
+import subprocess
 import sys
+import time
 from pathlib import Path
 
+from notes_mcp import __version__ as PKG_VERSION
 from notes_mcp.cli import _build_searcher
 from notes_mcp.config import Config
 from notes_mcp.search import Searcher
 
 EVAL_FILE = Path(__file__).resolve().parent.parent / "eval" / "queries.jsonl"
-REPORT_FILE = Path(__file__).resolve().parent.parent / "docs" / "检索eval报告.md"
-TEST_REPORT_FILE = Path(__file__).resolve().parent.parent / "docs" / "检索测试报告.md"
+REPORT_DIR = Path(__file__).resolve().parent.parent / "docs" / "04-测试"
 K_LIST = [1, 3, 5, 10]
 MAX_K = max(K_LIST)
 DIFFS = ["easy", "medium", "hard"]
 METHODS = ["纯语义", "语义+rerank"]
 
 logger = logging.getLogger(__name__)
+
+
+def get_version() -> tuple[str, str]:
+    """语义版本(__version__)+ git short hash,双重追溯。返回 (展示串, 文件名串)。"""
+    try:
+        git_hash = subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=Path(__file__).resolve().parent.parent,
+            stderr=subprocess.DEVNULL,
+        ).decode().strip()
+    except Exception:
+        git_hash = "nogit"
+    return f"v{PKG_VERSION} ({git_hash})", f"v{PKG_VERSION}-{git_hash}"
 
 
 def load_queries(path: Path) -> list[dict]:
@@ -165,10 +181,12 @@ def render_by_diff(summary: dict) -> str:
     return "\n".join(lines)
 
 
-def write_report(summary, total, n_pos, negatives, ambiguities) -> None:
+def write_report(summary, total, n_pos, negatives, ambiguities, version_display, date_str, path: Path) -> None:
     lines = [
         "# 检索 Eval 报告(纯语义 vs 语义+rerank)",
         "",
+        f"> **测试日期**:{date_str}  ",
+        f"> **版本**:{version_display}  ",
         f"> 正例 {n_pos} + 负例 {len(negatives)} + 歧义 {len(ambiguities)}。",
         "",
         "## 总体对比",
@@ -204,10 +222,10 @@ def write_report(summary, total, n_pos, negatives, ambiguities) -> None:
     for aq in ambiguities:
         top3 = [Path(s).name for s in aq["sources"]["语义+rerank"][:3]]
         lines.append(f"- `{aq['query']}` → {top3 if top3 else '(空)'}")
-    REPORT_FILE.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def write_test_report(per_query: list[dict]) -> None:
+def write_test_report(per_query: list[dict], version_display, date_str, path: Path) -> None:
     """正例双方法 rank 对比 + 负例/歧义(rerank top-3)。"""
     pos_rows, neg_rows, amb_rows = [], [], []
     passed = 0
@@ -238,6 +256,8 @@ def write_test_report(per_query: list[dict]) -> None:
     lines = [
         "# 检索测试报告(纯语义 vs 语义+rerank)",
         "",
+        f"> **测试日期**:{date_str}  ",
+        f"> **版本**:{version_display}  ",
         f"> 正例 {n_pos} 条(rerank 通过 {passed}) + 负例 {len(neg_rows)} + 歧义 {len(amb_rows)}。",
         "",
         "## 一、正例(rank 对比:看 rerank 是否提升头部排名)",
@@ -268,7 +288,7 @@ def write_test_report(per_query: list[dict]) -> None:
         "",
         "- **纯语义 rank vs +rerank rank**:若 rerank 把 rank>1 提到 1,说明精排生效。",
     ]
-    TEST_REPORT_FILE.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def main() -> int:
@@ -289,10 +309,16 @@ def main() -> int:
     n_pos = len([pq for pq in per_query if pq["type"] == "positive"])
     print(render_table(total, n_pos, len(negatives), len(ambiguities)))
     print(render_by_diff(summary))
-    write_report(summary, total, n_pos, negatives, ambiguities)
-    write_test_report(per_query)
-    logger.info("\n汇总报告: %s", REPORT_FILE)
-    logger.info("测试用例报告: %s", TEST_REPORT_FILE)
+
+    version_display, version_file = get_version()
+    date_str = time.strftime("%Y-%m-%d")
+    REPORT_DIR.mkdir(parents=True, exist_ok=True)
+    report_path = REPORT_DIR / f"检索eval_{date_str}_{version_file}.md"
+    test_path = REPORT_DIR / f"检索测试_{date_str}_{version_file}.md"
+    write_report(summary, total, n_pos, negatives, ambiguities, version_display, date_str, report_path)
+    write_test_report(per_query, version_display, date_str, test_path)
+    logger.info("\n汇总报告: %s", report_path)
+    logger.info("测试用例报告: %s", test_path)
     return 0
 
 

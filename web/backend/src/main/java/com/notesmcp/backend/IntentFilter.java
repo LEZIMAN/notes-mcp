@@ -19,7 +19,7 @@ import org.springframework.stereotype.Service;
  * - disableThinking 关推理(0.6s),分类任务不需要思考(踩坑 #25:/no_think 无效,必须 API 层)
  *
  * 只判 normal vs irrelevant;ambiguous(术语堆砌)归 normal 走主模型兜底(小模型分不清)。
- * 详见 docs/意图过滤选型报告.md。
+ * 详见 docs/02-设计/选型/意图过滤模型选型_2026-07-26_v0.1.md。
  */
 @Service
 public class IntentFilter {
