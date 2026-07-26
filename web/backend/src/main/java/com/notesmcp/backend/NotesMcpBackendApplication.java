@@ -15,8 +15,6 @@ import java.nio.file.Path;
 @SpringBootApplication
 public class NotesMcpBackendApplication {
 
-    private static final Path SETTINGS_PATH = Path.of("settings.json");
-
     public static void main(String[] args) {
         // MCP 子进程需要 NOTES_DIR 环境变量来扫描笔记。
         // 在 Spring 启动前从 settings.json 读取,确保 stdio 连接创建时已就绪。
@@ -26,21 +24,38 @@ public class NotesMcpBackendApplication {
         SpringApplication.run(NotesMcpBackendApplication.class, args);
     }
 
+    /** 从 cwd 向上查找 settings.json(mvn run 的 cwd 是 web/backend,settings.json 在项目根)。 */
+    private static Path findSettingsFile() {
+        Path dir = Path.of("").toAbsolutePath();
+        for (int i = 0; i < 6; i++) {
+            Path candidate = dir.resolve("settings.json");
+            if (Files.exists(candidate)) {
+                return candidate;
+            }
+            dir = dir.getParent();
+            if (dir == null) {
+                break;
+            }
+        }
+        return null;
+    }
+
     private static String readNotesDirFromSettings() {
-        try {
-            if (Files.exists(SETTINGS_PATH)) {
-                var json = new ObjectMapper().readTree(SETTINGS_PATH.toFile());
+        Path settings = findSettingsFile();
+        if (settings != null) {
+            try {
+                var json = new ObjectMapper().readTree(settings.toFile());
                 if (json.has("notesDir")) {
                     String dir = json.get("notesDir").asText();
                     if (!dir.isBlank()) {
-                        System.out.println("[notes-mcp] 从 settings.json 读取笔记目录: " + dir);
+                        System.out.println("[notes-mcp] 从 " + settings + " 读取笔记目录: " + dir);
                         return dir;
                     }
                 }
+            } catch (Exception e) {
+                System.out.println("[notes-mcp] 读取 settings.json 失败,使用默认: " + e.getMessage());
             }
-        } catch (Exception e) {
-            System.out.println("[notes-mcp] 读取 settings.json 失败,使用默认笔记目录: " + e.getMessage());
         }
-        return "d:/Learn/AI/笔记";
+        return "d:/Learn/AI/AI笔记";  // 默认(笔记目录已改名 笔记→AI笔记)
     }
 }

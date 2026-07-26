@@ -23,10 +23,12 @@ public class ChatController {
 
     private final ProviderRouter router;
     private final ChatHistoryService history;
+    private final IntentFilter intentFilter;
 
-    public ChatController(ProviderRouter router, ChatHistoryService history) {
+    public ChatController(ProviderRouter router, ChatHistoryService history, IntentFilter intentFilter) {
         this.router = router;
         this.history = history;
+        this.intentFilter = intentFilter;
     }
 
     /**
@@ -40,6 +42,14 @@ public class ChatController {
         String sessionId = request.sessionId();
         if (sessionId.isEmpty()) {
             sessionId = (String) history.createSession().get("id");
+        }
+
+        // 意图过滤:无关 query 直接拒答(省主模型,云端场景省钱)
+        if (intentFilter.isIrrelevant(request.message())) {
+            history.saveMessage(sessionId, "user", request.message());
+            String reply = "笔记里没有关于「" + request.message() + "」的相关内容。";
+            history.saveMessage(sessionId, "assistant", reply);
+            return Map.of("reply", reply, "sessionId", sessionId);
         }
 
         // 保存用户消息(当前轮)
@@ -74,6 +84,15 @@ public class ChatController {
         String sessionId = request.sessionId().isEmpty()
                 ? (String) history.createSession().get("id")
                 : request.sessionId();
+
+        // 意图过滤:无关 query 直接拒答(不流式,省主模型)
+        if (intentFilter.isIrrelevant(request.message())) {
+            history.saveMessage(sessionId, "user", request.message());
+            String reply = "笔记里没有关于「" + request.message() + "」的相关内容。";
+            history.saveMessage(sessionId, "assistant", reply);
+            return Flux.just(reply, "[DONE]");
+        }
+
         history.saveMessage(sessionId, "user", request.message());
 
         var recent = history.getRecentMessages(sessionId, 10);
