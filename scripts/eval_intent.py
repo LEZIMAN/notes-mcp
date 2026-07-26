@@ -5,10 +5,16 @@
 - 意图过滤层(IntentFilter)挡无关省云端 token,但它准不准?误拦截(把真问题拒答)
   比漏拦截(浪费 token)致命得多——本 eval 就是量化这个 trade-off。
 
-数据集:eval/queries.jsonl(复用检索 eval 同一份,一份数据两维度评估):
+职责边界(关键):意图层只判「领域相关性」,不判「库内是否有」。所以 negative 分两类:
+  - oftopic(明显领域外:红烧肉/天气)→ 期望拦截(意图层职责)
+  - outofkb(AI术语但库无:PPO/GNN)→ 期望放行(交全流程兜底:检索空→主模型拒答)
+  把 outofkb 算意图层漏拦截是边界划错——它该由端到端接地测试验证(见 e2e-grounding-test memory)。
+
+数据集:eval/queries.jsonl(复用检索 eval 同一份):
   - positive(知识库问题)→ 期望放行
-  - negative(完全无关)→ 期望拦截
   - ambiguous(术语堆砌)→ 期望放行(归 normal,主模型兜底)
+  - negative.offtopic(明显领域外)→ 期望拦截
+  - negative.outofkb(AI术语库无)→ 期望放行(交全流程)
 
 复刻 web/backend IntentFilter.java 的 prompt + 调用:
 - 走 ollama 原生 /api/chat(不是 /v1 OpenAI 兼容端点),精确传 think:false
@@ -17,14 +23,11 @@
 
 核心指标:
   - 准确率(总体)
-  - 误拦截率 FPR:positive/ambiguous 错判 irrelevant(致命:拒答真问题)
-  - 漏拦截率 FNR:negative 错判 normal(次致命:浪费 token)
+  - 误拦截率 FPR:positive/ambiguous/outofkb 错判 irrelevant(致命:拒答真问题)
+  - 漏拦截率 FNR:offtopic 错判 normal(浪费 token)
 
 用法:python scripts/eval_intent.py
-输出:
-  - 终端:核心指标
-  - md 测试报告:docs/测试报告/意图过滤eval_<日期>_v<版本>-<githash>.md
-    (测试报告规范:md 纯文本(git 可 diff 追溯) + 专属文件夹 + 每条标注日期/版本)
+输出:终端 + docs/04-测试/意图过滤eval_<日期>_v<版本>-<githash>.md
 """
 
 import json
@@ -43,11 +46,8 @@ from notes_mcp import __version__ as PKG_VERSION
 EVAL_FILE = Path(__file__).resolve().parent.parent / "eval" / "queries.jsonl"
 REPORT_DIR = Path(__file__).resolve().parent.parent / "docs" / "04-测试"
 
-# v2 试验 prompt(目标:降误拦截 FPR)。三处变化:
-#   ① 知识库描述补全(AI/编程/机器学习/LLM/Agent)
-#   ② normal 覆盖"术语/名词/并列"(治 T010 自洽解码 / T034 MessageWindowChatMemory 误拦)
-#   ③ irrelevant 收窄到"日常生活领域"(避免误伤 AI 术语)
-# 验证有效后同步 web/backend IntentFilter.java(单一信息源)。
+# 复刻 web/backend IntentFilter.java 的 PROMPT(逐字一致,单一信息源)。
+# 改这里必须同步改 IntentFilter.java,否则评估的不是生产行为。
 PROMPT = (
     "知识库是AI/编程/机器学习/LLM/Agent 的学习笔记。判断用户查询意图,只输出一个英文词:"
     "normal(只要涉及 AI/编程/机器学习/大模型/算法/计算机 的概念、术语、名词、问题——"
@@ -56,11 +56,26 @@ PROMPT = (
     "查询:"
 )
 
-# type → 是否期望拦截(意图过滤的"正确答案"映射)
-EXPECT_BLOCK = {"positive": False, "negative": True, "ambiguous": False}
-TYPE_CN = {"positive": "正例", "negative": "负例", "ambiguous": "歧义"}
-
 logger = logging.getLogger(__name__)
+
+
+def expected_block(qtype: str, subtype: str = "") -> bool:
+    """type+subtype → 是否期望拦截(按意图层职责边界)。
+
+    positive/ambiguous → 放行;
+    negative.offtopic(明显领域外)→ 拦截(意图层职责);
+    negative.outofkb(AI术语库无)→ 放行(交全流程,意图层不管"库有没有")。
+    """
+    if qtype == "negative":
+        return subtype == "offtopic"
+    return False
+
+
+def type_label(qtype: str, subtype: str = "") -> str:
+    """报告用的类型标签(含期望,一目了然)。"""
+    if qtype == "negative":
+        return "无关-领域外(应拦)" if subtype == "offtopic" else "无关-AI术语库无(交全流程)"
+    return {"positive": "正例(应放行)", "ambiguous": "歧义(应放行)"}.get(qtype, qtype)
 
 
 def load_queries(path: Path) -> list[dict]:
@@ -115,11 +130,11 @@ def evaluate(queries: list[dict], model: str) -> list[dict]:
     n = len(queries)
     for i, q in enumerate(queries, 1):
         qtype = q.get("type", "positive")
-        expect_block = EXPECT_BLOCK.get(qtype, False)
+        subtype = q.get("subtype", "")
+        expect_block = expected_block(qtype, subtype)
         actual_block, raw, elapsed = classify(q["query"], model)
         correct = actual_block == expect_block
         if not correct:
-            # actual=拦截但期望放行 → 误拦截(致命);反之漏拦截(浪费 token)
             err = "误拦截(拒答真问题)" if (actual_block and not expect_block) else "漏拦截(浪费token)"
         else:
             err = ""
@@ -127,6 +142,8 @@ def evaluate(queries: list[dict], model: str) -> list[dict]:
             {
                 "query": q["query"],
                 "type": qtype,
+                "subtype": subtype,
+                "label": type_label(qtype, subtype),
                 "expect_block": expect_block,
                 "actual_block": actual_block,
                 "raw": raw,
@@ -151,15 +168,17 @@ def metrics(rows: list[dict]) -> dict:
     """汇总指标。误拦截=期望放行却拦截;漏拦截=期望拦截却放行。"""
     n = len(rows)
     n_correct = sum(r["correct"] for r in rows)
-    should_pass = [r for r in rows if not r["expect_block"]]  # positive + ambiguous
-    should_block = [r for r in rows if r["expect_block"]]  # negative
+    should_pass = [r for r in rows if not r["expect_block"]]  # positive + ambiguous + outofkb
+    should_block = [r for r in rows if r["expect_block"]]  # negative.offtopic
     fp = [r for r in should_pass if r["actual_block"]]  # 误拦截(致命)
     fn = [r for r in should_block if not r["actual_block"]]  # 漏拦截(浪费)
 
     by_type: dict[str, dict] = {}
-    for t in ("positive", "negative", "ambiguous"):
-        sub = [r for r in rows if r["type"] == t]
-        by_type[t] = {"n": len(sub), "correct": sum(r["correct"] for r in sub)}
+    for r in rows:
+        lab = r["label"]
+        by_type.setdefault(lab, {"n": 0, "correct": 0})
+        by_type[lab]["n"] += 1
+        by_type[lab]["correct"] += 1 if r["correct"] else 0
 
     return {
         "n": n,
@@ -180,13 +199,13 @@ def metrics(rows: list[dict]) -> dict:
 
 def render_terminal(m: dict) -> str:
     lines = [
-        "\n意图过滤 Eval(qwen3:8b + think:false,复刻 IntentFilter)",
+        "\n意图过滤 Eval(qwen3:8b + think:false,复刻 IntentFilter;按职责边界)",
         "",
         f"  总体准确率: {m['n_correct']}/{m['n']} = {m['accuracy']:.1%}",
         f"  误拦截率 FPR: {m['n_fp']}/{m['n_should_pass']} = {m['fpr']:.1%}"
         f"  ← 致命(把真问题拒答),越低越好",
         f"  漏拦截率 FNR: {m['n_fn']}/{m['n_should_block']} = {m['fnr']:.1%}"
-        f"  ← 浪费 token,次致命",
+        f"  ← 浪费 token(仅 oftopic 计)",
         f"  平均耗时: {m['avg_time']:.1f}s/query",
     ]
     return "\n".join(lines)
@@ -218,9 +237,18 @@ def write_md_report(m, rows, model, version_display, date_str, path: Path) -> No
     L.append(f"> **测试日期**:{date_str}  ")
     L.append(f"> **版本**:{version_display}  ")
     L.append(f"> **模型**:{model} + think:false(ollama 原生 /api/chat)  ")
+    # 数据集按 subtype 细分
+    n_off = bt.get("无关-领域外(应拦)", {"n": 0})["n"]
+    n_ookb = bt.get("无关-AI术语库无(交全流程)", {"n": 0})["n"]
     L.append(
-        f"> **数据集**:`eval/queries.jsonl` — 正例 {bt['positive']['n']} / "
-        f"负例 {bt['negative']['n']} / 歧义 {bt['ambiguous']['n']}"
+        f"> **数据集**:`eval/queries.jsonl` — 正例 {bt.get('正例(应放行)', {'n':0})['n']} / "
+        f"歧义 {bt.get('歧义(应放行)', {'n':0})['n']} / "
+        f"无关-领域外 {n_off} / 无关-AI术语库无 {n_ookb}"
+    )
+    L.append("")
+    L.append(
+        "> **职责边界**:意图层只判领域相关性。「明显领域外」(offtopic)它拦;「AI术语但库无」"
+        "(outofkb)它放行,交全流程兜底(检索空→主模型拒答,见 e2e-grounding-test)。"
     )
     L.append("")
 
@@ -236,7 +264,7 @@ def write_md_report(m, rows, model, version_display, date_str, path: Path) -> No
     )
     L.append(
         f"| 漏拦截率 FNR | **{m['fnr']:.1%}** | {m['n_fn']}/{m['n_should_block']}"
-        " — 浪费 token |"
+        " — 仅 oftopic 计(outofkb 交全流程) |"
     )
     L.append(f"| 平均耗时 | {m['avg_time']:.1f}s/query | |")
     L.append("")
@@ -246,11 +274,14 @@ def write_md_report(m, rows, model, version_display, date_str, path: Path) -> No
     L.append("")
     L.append("| 类型 | n | 正确 | 准确率 |")
     L.append("|---|---|---|---|")
-    for typ in ("positive", "negative", "ambiguous"):
-        c = bt[typ]
+    # 固定顺序
+    order = ["正例(应放行)", "歧义(应放行)", "无关-领域外(应拦)", "无关-AI术语库无(交全流程)"]
+    for lab in order:
+        c = bt.get(lab)
+        if not c:
+            continue
         acc = c["correct"] / c["n"] if c["n"] else 0.0
-        expect = "应放行" if not EXPECT_BLOCK[typ] else "应拦截"
-        L.append(f"| {TYPE_CN[typ]}({expect}) | {c['n']} | {c['correct']} | {acc:.1%} |")
+        L.append(f"| {lab} | {c['n']} | {c['correct']} | {acc:.1%} |")
     L.append("")
 
     # —— 逐条测试明细(每条标注测试日期 + 版本)——
@@ -261,7 +292,7 @@ def write_md_report(m, rows, model, version_display, date_str, path: Path) -> No
     for i, r in enumerate(rows, 1):
         verdict = "✅" if r["correct"] else f"❌{r['err']}"
         L.append(
-            f"| T{i:03d} | {r['query']} | {TYPE_CN[r['type']]} | "
+            f"| T{i:03d} | {r['query']} | {r['label']} | "
             f"{'拦截' if r['expect_block'] else '放行'} | "
             f"{'拦截' if r['actual_block'] else '放行'} | {verdict} | "
             f"{date_str} | {version_display} |"
@@ -279,13 +310,17 @@ def write_md_report(m, rows, model, version_display, date_str, path: Path) -> No
     else:
         L.append("✅ 无误拦截(全部真问题正确放行)")
     L.append("")
-    L.append("### 漏拦截(浪费 token:无关问题被放行)")
+    L.append("### 漏拦截(浪费 token:offtopic 被放行)")
     L.append("")
     if m["fn"]:
         for r in m["fn"]:
             L.append(f"- `{r['query']}` → 模型输出:`{r['raw'][:50]}`")
     else:
-        L.append("✅ 无漏拦截(全部无关问题正确拦截)")
+        L.append("✅ 无漏拦截(全部 oftopic 正确拦截)")
+    L.append("")
+    L.append(
+        "> 注:outofkb(AI术语库无)放行**不算漏拦截**——它是设计预期,交全流程兜底。"
+    )
     L.append("")
 
     # —— 说明 ——
@@ -293,12 +328,12 @@ def write_md_report(m, rows, model, version_display, date_str, path: Path) -> No
     L.append("")
     L.append("- **误拦截(FPR)是核心红线**:意图过滤为省钱,但拒答真问题牺牲体验,FPR 须接近 0。")
     L.append(
-        "- **漏拦截(FNR)可容忍**:无关问题漏到主模型只浪费 token,"
-        "主模型基于空检索兜底「笔记里没有」。"
+        "- **漏拦截(FNR)只计 oftopic**:outofkb(AI术语库无)意图层放行是设计——"
+        "「库有没有」靠检索+主模型接地判断,交端到端测试验证(见 e2e-grounding-test)。"
     )
     L.append(
         "- **歧义(ambiguous)归放行**:术语堆砌交主模型兜底"
-        "(见 [意图过滤选型报告](../意图过滤选型报告.md))。"
+        "(见 [意图过滤模型选型](../02-设计/选型/意图过滤模型选型_2026-07-26_v0.1.md))。"
     )
 
     path.write_text("\n".join(L) + "\n", encoding="utf-8")

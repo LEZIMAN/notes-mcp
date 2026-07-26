@@ -43,15 +43,15 @@
 {"query": "记忆和反思怎么让 agent 跨轮学习", "relevant_files": ["06-Reflexion反思记忆精读", "11-LangGraph进阶"], "difficulty": "hard", "type": "positive"}
 {"query": "LangGraph 和手写 while 循环等价吗", "relevant_files": ["09-LangGraph状态机精读", "10-ReAct智能体精读"], "difficulty": "hard", "type": "positive"}
 {"query": "自注意力和普通注意力的区别", "relevant_files": ["02-RNN-与-Transformer", "03-The-Illustrated-Transformer"], "difficulty": "hard", "type": "positive"}
-{"query": "强化学习 PPO 算法", "relevant_files": [], "difficulty": "negative", "type": "negative"}
-{"query": "图神经网络 GNN", "relevant_files": [], "difficulty": "negative", "type": "negative"}
-{"query": "扩散模型 Diffusion 生成图片", "relevant_files": [], "difficulty": "negative", "type": "negative"}
-{"query": "知识图谱 Neo4j 图数据库", "relevant_files": [], "difficulty": "negative", "type": "negative"}
-{"query": "SVM 支持向量机 原理", "relevant_files": [], "difficulty": "negative", "type": "negative"}
-{"query": "红烧肉怎么做 家常菜谱", "relevant_files": [], "difficulty": "negative", "type": "negative"}
-{"query": "今天上证指数收盘点数", "relevant_files": [], "difficulty": "negative", "type": "negative"}
-{"query": "北京明天会下雨吗", "relevant_files": [], "difficulty": "negative", "type": "negative"}
-{"query": "英超联赛积分榜", "relevant_files": [], "difficulty": "negative", "type": "negative"}
+{"query": "强化学习 PPO 算法", "relevant_files": [], "difficulty": "negative", "type": "negative", "subtype": "outofkb"}
+{"query": "图神经网络 GNN", "relevant_files": [], "difficulty": "negative", "type": "negative", "subtype": "outofkb"}
+{"query": "扩散模型 Diffusion 生成图片", "relevant_files": [], "difficulty": "negative", "type": "negative", "subtype": "outofkb"}
+{"query": "知识图谱 Neo4j 图数据库", "relevant_files": [], "difficulty": "negative", "type": "negative", "subtype": "outofkb"}
+{"query": "SVM 支持向量机 原理", "relevant_files": [], "difficulty": "negative", "type": "negative", "subtype": "outofkb"}
+{"query": "红烧肉怎么做 家常菜谱", "relevant_files": [], "difficulty": "negative", "type": "negative", "subtype": "offtopic"}
+{"query": "今天上证指数收盘点数", "relevant_files": [], "difficulty": "negative", "type": "negative", "subtype": "offtopic"}
+{"query": "北京明天会下雨吗", "relevant_files": [], "difficulty": "negative", "type": "negative", "subtype": "offtopic"}
+{"query": "英超联赛积分榜", "relevant_files": [], "difficulty": "negative", "type": "negative", "subtype": "offtopic"}
 {"query": "Transformer RAG LangGraph ollama", "relevant_files": [], "difficulty": "ambiguous", "type": "ambiguous"}
 {"query": "MCP ReAct Function Calling qwen3", "relevant_files": [], "difficulty": "ambiguous", "type": "ambiguous"}
 {"query": "Token Embedding CoT Reflexion jieba", "relevant_files": [], "difficulty": "ambiguous", "type": "ambiguous"}
