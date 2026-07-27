@@ -9,6 +9,13 @@ cross-encoder 准但慢:(query,doc) 拼一起送模型,捕获交互,精准打分
 首次调用自动从 HuggingFace 下载模型(~2.2GB,缓存到 HF cache)。
 """
 
+import os
+
+# reranker 模型已本地缓存:离线模式避免 huggingface_hub 联网查 model_info 超时(踩坑 #27)
+# HF_HUB_OFFLINE 让 huggingface_hub 直接用本地缓存,不联网
+os.environ.setdefault("HF_HUB_OFFLINE", "1")
+os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+
 import logging
 
 logger = logging.getLogger(__name__)
