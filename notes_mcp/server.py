@@ -13,18 +13,26 @@ from pathlib import Path
 
 from fastmcp import FastMCP
 
+from notes_mcp.agentic.decomposer import QuestionDecomposer
 from notes_mcp.agentic.rewriter import QueryRewriter
 from notes_mcp.config import Config
 from notes_mcp.search import Hit, Searcher
 
 
-def create_mcp(searcher: Searcher, config: Config, rewriter: QueryRewriter | None = None) -> FastMCP:
+def create_mcp(
+    searcher: Searcher,
+    config: Config,
+    rewriter: QueryRewriter | None = None,
+    decomposer: QuestionDecomposer | None = None,
+) -> FastMCP:
     """用已建库的 searcher + config 创建 FastMCP server,注册三大原语。
 
-    rewriter:Agentic RAG 查询改写器(可选,测试传 fake);None 时按 config 内部造(生产)。
+    rewriter/decomposer:Agentic RAG 组件(可选,测试传 fake);None 时按 config 内部造(生产)。
     """
     if rewriter is None:
         rewriter = QueryRewriter(config.ollama_base_url, config.rewrite_model)
+    if decomposer is None:
+        decomposer = QuestionDecomposer(config.ollama_base_url, config.rewrite_model)
     mcp = FastMCP("notes-mcp")
 
     # —— Tools(找 · model-controlled)———————————————————
@@ -37,13 +45,17 @@ def create_mcp(searcher: Searcher, config: Config, rewriter: QueryRewriter | Non
 
     @mcp.tool()
     def deep_search(query: str, top_k: int = 5) -> str:
-        """智能检索学习笔记(Agentic RAG):先改写 query(口语化→正式/补关键词),再检索。
+        """智能检索学习笔记(Agentic RAG):对比类 query 分解多步检索 + RRF 融合。
 
-        适合口语化、关键词不全、表述偏离笔记术语的 query。
-        简单清晰的 query 可直接用 search_notes(更快)。
+        对比类(对比/区别/关系)→ 分解子查询分别检索再融合,覆盖多方;
+        单一 query → 直接检索(更快)。简单 query 可用 search_notes。
         """
-        rewritten = rewriter.rewrite(query)
-        hits = searcher.search(rewritten, top_k)
+        subs = decomposer.decompose(query)
+        if len(subs) == 1:
+            hits = searcher.search(subs[0], top_k)
+        else:
+            grouped = [searcher.search(sub, top_k) for sub in subs]
+            hits = fuse_hits(grouped, top_k)
         return format_hits(hits)
 
     @mcp.tool()
@@ -136,6 +148,23 @@ def format_hits(hits: list[Hit]) -> str:
     for i, h in enumerate(hits, 1):
         parts.append(f"### {i}. {h.title}\n\n{h.text}\n\n*来源:{h.source}*")
     return "\n\n".join(parts)
+
+
+def fuse_hits(grouped: list[list[Hit]], top_k: int, k: int = 60) -> list[Hit]:
+    """RRF 融合多组 hits(多步检索结果):按排名倒数融合 + chunk_id 去重,返回 top_k。
+
+    rerank 分跨 query 不可比(不同 query 的 rerank 分量纲不同),用 RRF(每子查询的排名)
+    更鲁棒——某条笔记在多个子查询中都靠前 → RRF 分高 → 融合后靠前。
+    """
+    scores: dict[str, float] = {}
+    hit_map: dict[str, Hit] = {}
+    for hits in grouped:
+        for rank, h in enumerate(hits, 1):
+            scores[h.chunk_id] = scores.get(h.chunk_id, 0.0) + 1.0 / (k + rank)
+            if h.chunk_id not in hit_map:
+                hit_map[h.chunk_id] = h
+    ranked = sorted(scores.items(), key=lambda x: -x[1])
+    return [hit_map[cid] for cid, _ in ranked[:top_k]]
 
 
 def _prompt_with_context(task: str, requirement: str, hits: list[Hit]) -> str:
