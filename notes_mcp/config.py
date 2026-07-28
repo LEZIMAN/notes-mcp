@@ -29,6 +29,7 @@ _DEFAULTS: dict[str, str] = {
     "LOG_LEVEL": "INFO",
     "RERANK_ENABLED": "true",
     "RERANK_MODEL": "BAAI/bge-reranker-v2-m3",
+    "REWRITE_MODEL": "qwen3:8b",  # Agentic RAG Step 1:查询改写模型(复用意图过滤层)
 }
 
 
@@ -63,6 +64,7 @@ class Config:
     log_level: str
     rerank_enabled: bool = True
     rerank_model: str = "BAAI/bge-reranker-v2-m3"
+    rewrite_model: str = "qwen3:8b"  # Agentic RAG 查询改写模型
 
     @classmethod
     def from_env(cls, env_file: Path | None = None) -> "Config":
@@ -95,6 +97,7 @@ class Config:
             log_level=_get("LOG_LEVEL"),
             rerank_enabled=_get("RERANK_ENABLED").lower() in ("true", "1", "yes"),
             rerank_model=_get("RERANK_MODEL"),
+            rewrite_model=_get("REWRITE_MODEL"),
         )
 
     def validate(self) -> None:

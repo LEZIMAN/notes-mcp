@@ -13,12 +13,18 @@ from pathlib import Path
 
 from fastmcp import FastMCP
 
+from notes_mcp.agentic.rewriter import QueryRewriter
 from notes_mcp.config import Config
 from notes_mcp.search import Hit, Searcher
 
 
-def create_mcp(searcher: Searcher, config: Config) -> FastMCP:
-    """用已建库的 searcher + config 创建 FastMCP server,注册三大原语。"""
+def create_mcp(searcher: Searcher, config: Config, rewriter: QueryRewriter | None = None) -> FastMCP:
+    """用已建库的 searcher + config 创建 FastMCP server,注册三大原语。
+
+    rewriter:Agentic RAG 查询改写器(可选,测试传 fake);None 时按 config 内部造(生产)。
+    """
+    if rewriter is None:
+        rewriter = QueryRewriter(config.ollama_base_url, config.rewrite_model)
     mcp = FastMCP("notes-mcp")
 
     # —— Tools(找 · model-controlled)———————————————————
@@ -27,6 +33,17 @@ def create_mcp(searcher: Searcher, config: Config) -> FastMCP:
     def search_notes(query: str, top_k: int = 5) -> str:
         """hybrid 检索学习笔记(语义 + 关键词融合),返回带出处。"""
         hits = searcher.search(query, top_k)
+        return format_hits(hits)
+
+    @mcp.tool()
+    def deep_search(query: str, top_k: int = 5) -> str:
+        """智能检索学习笔记(Agentic RAG):先改写 query(口语化→正式/补关键词),再检索。
+
+        适合口语化、关键词不全、表述偏离笔记术语的 query。
+        简单清晰的 query 可直接用 search_notes(更快)。
+        """
+        rewritten = rewriter.rewrite(query)
+        hits = searcher.search(rewritten, top_k)
         return format_hits(hits)
 
     @mcp.tool()

@@ -1,0 +1,20 @@
+{"query": "咋搞检索增强生成", "relevant_files": ["07-RAG检索增强生成精读", "01-RAG项目工程实战"], "type": "rewrite"}
+{"query": "那个边想边做的循环 agent", "relevant_files": ["01-多工具与-ReAct-循环", "02-ReAct论文精读"], "type": "rewrite"}
+{"query": "反思然后记住教训", "relevant_files": ["06-Reflexion反思记忆精读"], "type": "rewrite"}
+{"query": "思考链子是啥", "relevant_files": ["04-CoT思维链精读"], "type": "rewrite"}
+{"query": "状态机框架搞 agent", "relevant_files": ["09-LangGraph状态机精读", "11-LangGraph进阶"], "type": "rewrite"}
+{"query": "自注意力咋回事", "relevant_files": ["02-RNN-与-Transformer", "03-The-Illustrated-Transformer"], "type": "rewrite"}
+{"query": "温度参数调啥的", "relevant_files": ["01-LLM基本原理-Token-Temperature-Top-P"], "type": "rewrite"}
+{"query": "本地跑大模型咋弄", "relevant_files": ["02-本地部署推理Agent-Ollama与Qwen3"], "type": "rewrite"}
+{"query": "工具调用那个协议", "relevant_files": ["12-MCP协议精读"], "type": "rewrite"}
+{"query": "向量数据库存啥的", "relevant_files": ["03-检索三件套"], "type": "rewrite"}
+{"query": "函数调用怎么用", "relevant_files": ["02-Function-Calling-与-Agent"], "type": "rewrite"}
+{"query": "生成文本那个搜索算法", "relevant_files": ["04-How-to-generate-text"], "type": "rewrite"}
+{"query": "RSG 检索增强生成", "relevant_files": ["07-RAG检索增强生成精读", "01-RAG项目工程实战"], "type": "typo"}
+{"query": "Transfomer 自注意力", "relevant_files": ["02-RNN-与-Transformer", "03-The-Illustrated-Transformer"], "type": "typo"}
+{"query": "React 推理行动循环", "relevant_files": ["01-多工具与-ReAct-循环", "02-ReAct论文精读"], "type": "typo"}
+{"query": "Reflection 反思记忆", "relevant_files": ["06-Reflexion反思记忆精读"], "type": "typo"}
+{"query": "embeding 向量嵌入", "relevant_files": ["08-Embedding与切块策略"], "type": "typo"}
+{"query": "chuncker 切块策略", "relevant_files": ["08-Embedding与切块策略"], "type": "typo"}
+{"query": "qwen 本地部署推理", "relevant_files": ["02-本地部署推理Agent-Ollama与Qwen3"], "type": "typo"}
+{"query": "bge 向量模型", "relevant_files": ["08-Embedding与切块策略", "03-检索三件套"], "type": "typo"}
