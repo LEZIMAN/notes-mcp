@@ -1,10 +1,9 @@
 {"query": "对比 Transformer 和 RNN", "relevant_files": ["02-RNN-与-Transformer", "03-The-Illustrated-Transformer"], "type": "compare"}
 {"query": "ReAct 和 Reflexion 的区别", "relevant_files": ["02-ReAct论文精读", "06-Reflexion反思记忆精读"], "type": "compare"}
 {"query": "CoT 和 Self-Consistency 的关系", "relevant_files": ["04-CoT思维链精读", "05-Self-Consistency自洽解码"], "type": "compare"}
-{"query": "LangGraph 和手写循环的区别", "relevant_files": ["09-LangGraph状态机精读", "10-ReAct智能体精读"], "type": "compare"}
 {"query": "Function Calling 和 MCP 的关系", "relevant_files": ["02-Function-Calling-与-Agent", "12-MCP协议精读"], "type": "compare"}
 {"query": "对比 Embedding 和 Rerank", "relevant_files": ["08-Embedding与切块策略", "03-检索三件套"], "type": "compare"}
-{"query": "ReAct 和 Function Calling 区别", "relevant_files": ["01-多工具与-ReAct-循环", "02-Function-Calling-与-Agent"], "type": "compare"}
-{"query": "Self-Consistency 和 CoT 哪个好", "relevant_files": ["04-CoT思维链精读", "05-Self-Consistency自洽解码"], "type": "compare"}
-{"query": "对比多工具 ReAct 循环和 ReAct 论文", "relevant_files": ["01-多工具与-ReAct-循环", "02-ReAct论文精读"], "type": "compare"}
-{"query": "Chroma 向量库和 BM25 的区别", "relevant_files": ["03-检索三件套"], "type": "compare"}
+{"query": "CoT、Self-Consistency 和 Reflexion 三者的关系", "relevant_files": ["04-CoT思维链精读", "05-Self-Consistency自洽解码", "06-Reflexion反思记忆精读"], "type": "multi-entity"}
+{"query": "Embedding、切块和 rerank 三者的关系", "relevant_files": ["08-Embedding与切块策略", "03-检索三件套"], "type": "multi-entity"}
+{"query": "RAG 是什么以及怎么用 LangGraph 实现", "relevant_files": ["07-RAG检索增强生成精读", "09-LangGraph状态机精读"], "type": "multi-intent"}
+{"query": "ReAct 是什么以及在多智能体里怎么用", "relevant_files": ["02-ReAct论文精读", "04-多智能体"], "type": "multi-intent"}
